@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Xcode
+*.xcodeproj/
+!*.xcodeproj/project.pbxproj
+xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+build/
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# XcodeGen generates ArrowClash.xcodeproj from App/project.yml
+App/ArrowClash.xcodeproj/

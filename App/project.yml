@@ -1,0 +1,42 @@
+# XcodeGen spec for the ArrowClash iOS app target.
+# Generates ArrowClash.xcodeproj that depends on the local ArrowClashSim
+# Swift package. Run from the repository root:
+#
+#   brew install xcodegen   # once
+#   cd App && xcodegen generate
+#   open ArrowClash.xcodeproj
+#
+# The Xcode project file itself is intentionally not committed; it is generated
+# from this spec so it stays in sync and avoids merge conflicts. You can also
+# create the project by hand in Xcode and add ArrowClashSim as a local package
+# if you prefer not to use XcodeGen.
+
+name: ArrowClash
+options:
+  bundleIdPrefix: net.montyinc
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  ArrowClashSim:
+    path: ../ArrowClashSim
+
+targets:
+  ArrowClash:
+    type: application
+    platform: iOS
+    sources:
+      - path: ArrowClash
+    dependencies:
+      - package: ArrowClashSim
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.montyinc.arrowclash
+        GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.9"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
