@@ -38,6 +38,22 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return err
 	}
 
+	// Progression RPCs (server-authoritative).
+	if err := initializer.RegisterRpc("match_end", rpcMatchEnd); err != nil {
+		return err
+	}
+	if err := initializer.RegisterRpc("get_profile", rpcGetProfile); err != nil {
+		return err
+	}
+	if err := initializer.RegisterRpc("set_loadout", rpcSetLoadout); err != nil {
+		return err
+	}
+
+	// XP leaderboard (authoritative: only the server runtime writes it).
+	if err := nk.LeaderboardCreate(ctx, leaderboardID, true, "desc", "set", "", nil); err != nil {
+		logger.Warn("leaderboard create (may already exist): %v", err)
+	}
+
 	logger.Info("arrowclash module loaded")
 	return nil
 }

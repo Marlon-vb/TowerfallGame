@@ -10,6 +10,8 @@ struct ContentView: View {
         switch model.screen {
         case .menu, .searching:
             MenuView(model: model)
+        case .loadout:
+            LoadoutView(profileService: model.profileService, onClose: { model.closeLoadout() })
         case .playing:
             if let scene = model.scene {
                 GameView(scene: scene, model: model)

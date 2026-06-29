@@ -1,6 +1,7 @@
 // AppModel.swift
 // Top-level screen state and the glue from the menu into a local or online
-// match. Owns the InputBus and the active GameScene so views stay simple.
+// match, plus progression. Owns the InputBus, the active GameScene, and the
+// ProfileService.
 
 import SwiftUI
 import ArrowClashSim
@@ -10,6 +11,7 @@ import ArrowClashNet
 final class AppModel: ObservableObject {
     enum Screen {
         case menu
+        case loadout
         case searching
         case playing
     }
@@ -25,6 +27,7 @@ final class AppModel: ObservableObject {
     @Published var matchResult: Bool?
 
     let input = InputBus()
+    let profileService = ProfileService()
     private(set) var scene: GameScene?
 
     private var controller: OnlineMatchController?
@@ -33,8 +36,8 @@ final class AppModel: ObservableObject {
     func startLocalPractice() {
         mode = .local
         matchResult = nil
-        let driver = LocalDriver()
-        scene = makeScene(driver: driver)
+        let own = profileService.profile?.loadout ?? .default
+        scene = makeScene(driver: LocalDriver(), loadouts: [own, .default])
         screen = .playing
     }
 
@@ -56,15 +59,24 @@ final class AppModel: ObservableObject {
                 self?.screen = .menu
             }
         }
-        controller.onReady = { [weak self] session in
+        controller.onReady = { [weak self] session, loadouts in
             Task { @MainActor in
                 guard let self = self else { return }
                 let driver = OnlineDriver(session: session)
-                self.scene = self.makeScene(driver: driver)
+                self.scene = self.makeScene(driver: driver, loadouts: loadouts)
                 self.screen = .playing
             }
         }
         controller.start()
+    }
+
+    func openLoadout() {
+        screen = .loadout
+        Task { await profileService.refresh() }
+    }
+
+    func closeLoadout() {
+        screen = .menu
     }
 
     func rematch() {
@@ -87,10 +99,18 @@ final class AppModel: ObservableObject {
         screen = .menu
     }
 
-    private func makeScene(driver: SceneDriver) -> GameScene {
-        let scene = GameScene(input: input, driver: driver)
-        scene.onMatchEnd = { [weak self] localWon in
-            Task { @MainActor in self?.matchResult = localWon }
+    private func makeScene(driver: SceneDriver, loadouts: [CosmeticLoadout]) -> GameScene {
+        var ld = loadouts
+        while ld.count < 2 { ld.append(.default) }
+        let skins = ld.map { Cosmetics.skinColor($0.skin) }
+        let trails = ld.map { Cosmetics.trailColor($0.trail) }
+
+        let scene = GameScene(input: input, driver: driver, skinColors: skins, trailColors: trails)
+        scene.onMatchEnd = { [weak self] won, kills, rounds in
+            Task { @MainActor in
+                self?.matchResult = won
+                await self?.profileService.submitMatchEnd(won: won, kills: kills, rounds: rounds)
+            }
         }
         return scene
     }

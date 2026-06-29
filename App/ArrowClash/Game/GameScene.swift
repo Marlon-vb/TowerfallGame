@@ -27,9 +27,13 @@ final class GameScene: SKScene {
     private var scoreLabel = SKLabelNode()
     private var centerLabel = SKLabelNode()
 
-    // Fired once when the match ends; argument is whether the local player won.
-    var onMatchEnd: ((Bool) -> Void)?
+    // Fired once when the match ends: (localWon, localKills, totalRounds).
+    var onMatchEnd: ((Bool, Int, Int) -> Void)?
     private var matchEndFired = false
+
+    // Cosmetic colors per player slot (skin = body, trail = arrow color).
+    private let skinColors: [SKColor]
+    private let trailColors: [SKColor]
 
     private var worldWidthPx: Float { Float(map.cols * config.tileSize) }
     private var worldHeightPx: Float { Float(map.rows * config.tileSize) }
@@ -39,9 +43,15 @@ final class GameScene: SKScene {
         SKColor(red: 1.00, green: 0.45, blue: 0.40, alpha: 1.0),
     ]
 
-    init(input: InputBus, driver: SceneDriver) {
+    init(input: InputBus,
+         driver: SceneDriver,
+         skinColors: [SKColor] = [SKColor(red: 0.30, green: 0.75, blue: 1.00, alpha: 1.0),
+                                  SKColor(red: 1.00, green: 0.45, blue: 0.40, alpha: 1.0)],
+         trailColors: [SKColor] = [.white, .white]) {
         self.input = input
         self.driver = driver
+        self.skinColors = skinColors
+        self.trailColors = trailColors
         let worldSize = CGSize(
             width: GameConfig.default.tileSize * TileMap.defaultArena().cols,
             height: GameConfig.default.tileSize * TileMap.defaultArena().rows
@@ -82,7 +92,7 @@ final class GameScene: SKScene {
         let h = CGFloat(config.playerHeight.toFloat)
         for i in 0..<state.players.count {
             let node = SKShapeNode(rectOf: CGSize(width: w, height: h), cornerRadius: 2)
-            node.fillColor = playerColors[i % playerColors.count]
+            node.fillColor = i < skinColors.count ? skinColors[i] : playerColors[i % playerColors.count]
             node.strokeColor = (i == driver.localPlayer) ? .white : .clear
             node.lineWidth = 1
             addChild(node)
@@ -177,6 +187,10 @@ final class GameScene: SKScene {
             }
             node.position = skPoint(cx, cy)
             node.zRotation = arrowRotation(cur)
+            let owner = Int(cur.owner)
+            if owner >= 0 && owner < trailColors.count {
+                node.fillColor = trailColors[owner]
+            }
         }
 
         let me = driver.localPlayer
@@ -201,11 +215,14 @@ final class GameScene: SKScene {
         case .roundOver:
             centerLabel.text = "ROUND OVER"
         case .matchOver:
-            let localWon = state.winner == Int8(driver.localPlayer)
+            let me = driver.localPlayer
+            let localWon = state.winner == Int8(me)
             centerLabel.text = localWon ? "YOU WIN" : "YOU LOSE"
             if !matchEndFired {
                 matchEndFired = true
-                onMatchEnd?(localWon)
+                let kills = me < state.scores.count ? state.scores[me] : 0
+                let rounds = state.scores.reduce(0, +)
+                onMatchEnd?(localWon, kills, rounds)
             }
         }
     }

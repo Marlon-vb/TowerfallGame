@@ -28,6 +28,8 @@ struct MenuView: View {
                         .buttonStyle(MenuButtonStyle(prominent: true))
                     Button("Local Practice") { model.startLocalPractice() }
                         .buttonStyle(MenuButtonStyle(prominent: false))
+                    Button("Loadout") { model.openLoadout() }
+                        .buttonStyle(MenuButtonStyle(prominent: false))
                     if !model.statusText.isEmpty {
                         Text(model.statusText)
                             .font(.footnote)

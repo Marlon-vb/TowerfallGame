@@ -40,7 +40,7 @@ final class OnlineMatchController {
     var useSSL: Bool = false
 
     var onStatus: ((String) -> Void)?
-    var onReady: ((RollbackSession) -> Void)?
+    var onReady: ((RollbackSession, [CosmeticLoadout]) -> Void)?
     var onError: ((String) -> Void)?
 
     private let auth: AuthProvider
@@ -136,6 +136,7 @@ final class OnlineMatchController {
     private struct StartPayload: Decodable {
         let seed: Int64
         let order: [String]
+        let loadouts: [CosmeticLoadout]?
     }
 
     private func handleStart(data: [UInt8]) {
@@ -150,8 +151,11 @@ final class OnlineMatchController {
         didStart = true
         let seed = UInt64(bitPattern: payload.seed)
         let rollback = RollbackSession(localPlayer: slot, transport: transport, config: .default, seed: seed)
+        // Loadouts are aligned with order (index == player slot).
+        var loadouts = payload.loadouts ?? []
+        while loadouts.count < payload.order.count { loadouts.append(.default) }
         onStatus?("Match starting...")
-        onReady?(rollback)
+        onReady?(rollback, loadouts)
     }
 
     func leave() {
