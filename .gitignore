@@ -15,8 +15,9 @@ build/
 .swiftpm/
 Package.resolved
 
-# XcodeGen generates ArrowClash.xcodeproj from App/project.yml
+# XcodeGen generates ArrowClash.xcodeproj and Info.plist from App/project.yml
 App/ArrowClash.xcodeproj/
+App/ArrowClash/Info.plist
 
 # Go plugin build artifacts
 *.so

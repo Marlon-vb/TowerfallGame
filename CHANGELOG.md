@@ -16,6 +16,10 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 - Client: `ProfileService` (RPC wrapper), `Cosmetics` catalog mirror, Loadout
   screen (equip unlocked cosmetics), match result submitted on match end, skin
   and arrow-trail colors applied in-match from START.
+- `ProfileService` talks to Nakama over the HTTP REST API (URLSession) because
+  nakama-swift v1.2.0 exposes RPC/storage payloads as `internal` and they can't
+  be read from the app module. Added a dev-only ATS exception (cleartext HTTP to
+  the local server) via a generated Info.plist.
 
 ## Phase 4 - Match flow (2026-06-29)
 - Added deterministic round/match state machine (`MatchPhase`: countdown,
