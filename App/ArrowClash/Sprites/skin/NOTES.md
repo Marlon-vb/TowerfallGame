@@ -1,8 +1,12 @@
 # skin/ — base body sprites (PixelLab output)
 
-Source: PixelLab `create_character` + `animate_character` (template `breathing-idle`).
+Source: PixelLab `create_character` + `animate_character`.
 Character ID: `060a7f8f-8a77-4324-9c3b-32cbc6b3e423`
 Generated: 2026-06-29.
+
+User decision (2026-06-29): accept the baked-in hair on the base body and
+SKIP the hair layer entirely. The "skin" sheet is treated as
+"skin + default short dark hair." No separate hair sheets will be generated.
 
 ## Actual output (what the loader has to expect)
 
@@ -16,48 +20,85 @@ Generated: 2026-06-29.
   the prompt. Mark the skin catalog entry **non-tintable** when this art
   ships, OR post-process to grayscale offline before catalog flips on tinting.
 - **Background:** transparent (alpha).
-- **Directions returned:** south, east, north, west (4 dirs).
-  `east` is the facing-right side view used for in-game rendering;
-  the engine mirrors `east` for left-facing.
+- **Directions returned:** south, east, north, west (4 dirs) for the
+  static rotations. Animations were only generated for `east` (facing-right
+  side view); the engine mirrors `east` for left-facing.
 - **View:** "side" (eye-level).
 
-## Animations present
+## Animations present (all east direction)
 
-| Animation | Template            | Frames | Dir generated | Notes                |
-|-----------|---------------------|--------|---------------|----------------------|
-| idle      | `breathing-idle`    | 4      | east          | gentle bob/breath    |
+Frame counts diverge from docs/SPRITE_ASSET_SPEC.md — PixelLab picks its
+own counts per template and v3 customs add a reference frame. The loader
+should read from this table, not the spec table.
+
+| Animation | Source                            | Frames | Folder    | Notes                                       |
+|-----------|-----------------------------------|--------|-----------|---------------------------------------------|
+| idle      | template `breathing-idle`         | 4      | `idle/`   | gentle bob/breath; loops                    |
+| run       | template `running-8-frames`       | 8      | `run/`    | full run cycle; loops                       |
+| jump      | template `jumping-1`              | 9      | `jump/`   | full takeoff→apex sequence; play once/hold  |
+| fall      | v3 custom                         | 5      | `fall/`   | frame 0 = reference pose, 1–4 = animated    |
+| dash      | v3 custom                         | 5      | `dash/`   | frame 0 = reference pose, 1–4 = animated    |
+| shoot     | v3 custom (bow draw + release)    | 5      | `shoot/`  | NO bow drawn — base body has no bow; layer  |
+|           |                                   |        |           | a bow accessory on top for the actual look  |
+| die       | template `falling-back-death`     | 7      | `die/`    | knockback → on ground; play once/hold       |
 
 ## Files
 
 ```
 skin/
-  NOTES.md                  (this file)
-  rotations/
-    south.png  east.png  north.png  west.png   (single static reference per dir)
-  idle/
-    east_0.png  east_1.png  east_2.png  east_3.png   (4 idle frames, east)
+  NOTES.md
+  rotations/                  (static reference, NOT animated)
+    south.png  east.png  north.png  west.png
+  idle/   east_0.png … east_3.png   (4 frames)
+  run/    east_0.png … east_7.png   (8 frames)
+  jump/   east_0.png … east_8.png   (9 frames)
+  fall/   east_0.png … east_4.png   (5 frames)
+  dash/   east_0.png … east_4.png   (5 frames)
+  shoot/  east_0.png … east_4.png   (5 frames)
+  die/    east_0.png … east_6.png   (7 frames)
 ```
 
-## Issues flagged for review (before generating more animations)
+## Implications for the atlas loader
 
-1. **Hair baked in.** The body sprite has short dark hair, even though the
-   prompt asked for "no hair" (hair is supposed to be a separate layer).
-   PixelLab's character template seems to always include hair on humanoids.
-   Options: (a) accept it — treat the skin sheet as "skin + default hair"
-   and skip the hair layer entirely; (b) regenerate with `create_character_state`
-   asking to remove hair / bald; (c) drop layered hair and ship presets only.
-2. **Full color, not grayscale.** Per pipeline, skin is tintable. Either
-   convert to grayscale post-hoc or mark non-tintable.
-3. **Per-frame PNGs, not row-strip.** AtlasSpriteProvider in
-   docs/SPRITE_PIPELINE.md expects a single sheet per part with rows = states.
-   Loader needs either (a) a stitcher step to combine per-frame PNGs into a
-   sheet at build time, or (b) extend the provider to accept per-frame files.
-4. **48 x 64 spec vs 68 x 68 actual.** Either update SPRITE_ASSET_SPEC.md to
-   match PixelLab's output, or post-crop frames to 48 x 64. The character
-   itself fits in ~48 px so cropping is feasible but loses the animation
-   padding PixelLab adds.
+`AtlasSpriteProvider` (per docs/SPRITE_PIPELINE.md) assumes a single
+row-strip sheet per part with a JSON manifest naming row/frames/fps. With
+per-frame PNGs, the simplest paths:
+
+1. **Build-time stitcher (recommended):** small script (e.g. `scripts/`)
+   reads `skin/<state>/east_*.png`, packs them into one row per state, writes
+   `skin/skin.png` + `skin/manifest.json`. Loader stays as-spec.
+2. **Loader-side per-frame loading:** extend the provider to accept
+   `{folder, fileGlob}` per state and load `SKTexture` per file.
+
+Either way, the **manifest** for skin should be (matching the table above):
+```
+{
+  "frameWidth": 68, "frameHeight": 68, "tintable": false,
+  "states": {
+    "idle":  { "frames": 4, "fps": 6 },
+    "run":   { "frames": 8, "fps": 14 },
+    "jump":  { "frames": 9, "fps": 12, "loop": false },
+    "fall":  { "frames": 5, "fps": 10, "loop": false },
+    "dash":  { "frames": 5, "fps": 16, "loop": false },
+    "shoot": { "frames": 5, "fps": 18, "loop": false },
+    "die":   { "frames": 7, "fps": 10, "loop": false }
+  }
+}
+```
+
+## Open differences from docs/SPRITE_ASSET_SPEC.md (need a spec update)
+
+- frame size 68×68 vs 48×64
+- per-frame PNGs vs row-strip sheet with `row:` indices
+- skin is non-tintable (full color) vs grayscale tintable
+- frame counts: jump 9 vs 2, fall 5 vs 2, dash 5 vs 2, shoot 5 vs 4, die 7 vs 4
+- no hair/shirt/pants/accessory sheets — layered customization deferred,
+  ship-as-preset for now
+
+Recommend updating SPRITE_ASSET_SPEC.md to reflect PixelLab's actual output
+before building the loader, so the spec and reality match.
 
 ## Cost so far
 
-2 generations used (1 for create_character standard mode, 1 for one-direction
-template idle animation). Of 5000/mo on subscription.
+9 generations used (1 create_character + 7 animations + 1 retry on dash).
+Of 5000/mo on subscription.
