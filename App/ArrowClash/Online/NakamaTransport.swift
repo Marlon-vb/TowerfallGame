@@ -1,13 +1,10 @@
 // NakamaTransport.swift
 // Adapts a Nakama realtime socket to the rollback layer's InputTransport. The
 // server relays our OpInput packets to the opponent; we encode/decode them with
-// PacketCodec. This is the ONLY rollback-facing Nakama code besides the
-// controller, so if the Nakama Swift SDK API differs from what is used here,
-// the fixes are confined to this file and OnlineMatchController.
+// PacketCodec. This plus OnlineMatchController are the only Nakama-SDK-facing
+// files, so SDK changes stay contained here.
 //
-// NOTE: not compiled in this environment (no iOS toolchain / Nakama SDK here).
-// Method/type names follow the documented nakama-swift async API and may need
-// small adjustments to match your resolved SDK version.
+// Written against nakama-swift v1.2.0.
 
 import Foundation
 import ArrowClashSim
@@ -15,22 +12,23 @@ import ArrowClashNet
 import Nakama
 
 enum MatchOpCode {
-    static let start: Int64 = 1
-    static let input: Int64 = 2
+    // sendMatchData takes opCode: Int in this SDK.
+    static let start: Int = 1
+    static let input: Int = 2
 }
 
 final class NakamaTransport: InputTransport {
-    private let socket: Socket
+    private let socket: SocketProtocol
     private let matchId: String
     private let lock = NSLock()
     private var inbound: [InputPacket] = []
 
-    init(socket: Socket, matchId: String) {
+    init(socket: SocketProtocol, matchId: String) {
         self.socket = socket
         self.matchId = matchId
     }
 
-    // Called by the controller's match-data callback for OpInput messages.
+    // Called by the controller's onMatchData handler for OpInput messages.
     func ingest(data: [UInt8]) {
         guard let packet = PacketCodec.decode(data) else { return }
         lock.lock()

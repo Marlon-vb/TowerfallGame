@@ -25,7 +25,7 @@ packages:
   # one that exists for your toolchain (or pin a branch/revision).
   Nakama:
     url: https://github.com/heroiclabs/nakama-swift
-    from: "2.0.0"
+    from: "1.2.0"
 
 targets:
   ArrowClash:

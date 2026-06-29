@@ -1,14 +1,12 @@
 // OnlineMatchController.swift
-// Drives the online path: device auth -> matchmaking -> join match -> receive
-// the START (slot + shared seed) -> build a RollbackSession fed by a
+// Drives the online path: device auth -> connect -> matchmaking -> join match
+// -> receive START (slot + shared seed) -> build a RollbackSession fed by a
 // NakamaTransport. Auth is behind a tiny seam so Game Center could replace
 // device id later.
 //
-// NOTE: not compiled in this environment (no iOS toolchain / Nakama SDK here).
-// The Nakama Swift SDK API (client/socket method and property names, async
-// shape) is the most likely thing to need small adjustments to match your
-// resolved SDK version. All such usage is confined to this file and
-// NakamaTransport.swift.
+// Written against nakama-swift v1.2.0. connect() is synchronous; matchmaking is
+// started from the onConnect callback. All Nakama-SDK usage is confined to this
+// file and NakamaTransport.swift.
 
 import Foundation
 import ArrowClashSim
@@ -16,7 +14,6 @@ import ArrowClashNet
 import Nakama
 
 protocol AuthProvider {
-    // Returns a stable identifier for this device/account.
     func identifier() -> String
 }
 
@@ -47,8 +44,8 @@ final class OnlineMatchController {
     var onError: ((String) -> Void)?
 
     private let auth: AuthProvider
-    private var client: Client?
-    private var socket: Socket?
+    private var client: GrpcClient?
+    private var socket: SocketProtocol?
     private var nakamaSession: Session?
     private var transport: NakamaTransport?
     private var matchId: String?
@@ -59,58 +56,71 @@ final class OnlineMatchController {
     }
 
     func start() {
-        Task { await run() }
+        Task { await connectAndQueue() }
     }
 
-    private func run() async {
+    private func connectAndQueue() async {
         do {
             onStatus?("Connecting...")
             let client = GrpcClient(serverKey: serverKey, host: serverHost, port: serverPort, ssl: useSSL)
             self.client = client
 
-            let session = try await client.authenticateDevice(id: auth.identifier())
+            let session = try await client.authenticateDevice(id: auth.identifier(), create: true, username: nil, vars: nil, retryConfig: nil)
             self.nakamaSession = session
 
-            let socket = client.createSocket()
+            let socket = client.createSocket(host: nil, port: nil, ssl: nil, socketAdapter: nil)
             self.socket = socket
-            try await socket.connect(session: session)
 
+            socket.onError = { [weak self] error in
+                self?.onError?("\(error)")
+            }
             socket.onMatchData = { [weak self] matchData in
-                self?.handleMatchData(opCode: matchData.opCode, data: [UInt8](matchData.data))
+                self?.handleMatchData(opCode: Int(matchData.opCode), data: [UInt8](matchData.data))
             }
             socket.onMatchmakerMatched = { [weak self] matched in
                 Task { await self?.joinMatch(matched) }
             }
+            socket.onConnect = { [weak self] in
+                Task { await self?.enterMatchmaking() }
+            }
 
-            onStatus?("Finding opponent...")
-            _ = try await socket.addMatchmaker(query: "*", minCount: 2, maxCount: 2, stringProperties: nil, numericProperties: nil)
+            socket.connect(session: session)
         } catch {
             onError?("\(error)")
         }
     }
 
-    private func joinMatch(_ matched: MatchmakerMatched) async {
+    private func enterMatchmaking() async {
+        do {
+            onStatus?("Finding opponent...")
+            _ = try await socket?.addMatchmaker(query: "*", minCount: 2, maxCount: 2, stringProperties: nil, numericProperties: nil, countMultiple: nil)
+        } catch {
+            onError?("\(error)")
+        }
+    }
+
+    private func joinMatch(_ matched: Nakama_Realtime_MatchmakerMatched) async {
         do {
             onStatus?("Match found, joining...")
             guard let socket = socket else { return }
-            let match: Match
-            if let id = matched.matchId {
-                match = try await socket.joinMatch(matchId: id)
-            } else if let token = matched.token {
-                match = try await socket.joinMatch(token: token)
+            let match: Nakama_Realtime_Match
+            if !matched.matchID.isEmpty {
+                match = try await socket.joinMatch(matchId: matched.matchID, metadata: nil)
+            } else if !matched.token.isEmpty {
+                match = try await socket.joinMatchToken(token: matched.token)
             } else {
-                onError?("matchmaker returned no match id")
+                onError?("matchmaker returned no match id or token")
                 return
             }
-            self.matchId = match.matchId
-            self.transport = NakamaTransport(socket: socket, matchId: match.matchId)
-            onStatus?("Waiting for opponent to be ready...")
+            self.matchId = match.matchID
+            self.transport = NakamaTransport(socket: socket, matchId: match.matchID)
+            onStatus?("Waiting for opponent...")
         } catch {
             onError?("\(error)")
         }
     }
 
-    private func handleMatchData(opCode: Int64, data: [UInt8]) {
+    private func handleMatchData(opCode: Int, data: [UInt8]) {
         switch opCode {
         case MatchOpCode.start:
             handleStart(data: data)
@@ -149,7 +159,7 @@ final class OnlineMatchController {
             if let socket = socket, let id = id {
                 try? await socket.leaveMatch(matchId: id)
             }
-            try? await socket?.disconnect()
+            socket?.disconnect()
         }
     }
 }
