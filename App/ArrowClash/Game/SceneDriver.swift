@@ -16,14 +16,15 @@ protocol SceneDriver: AnyObject {
 // Local single-player practice: player 1 is an idle dummy.
 final class LocalDriver: SceneDriver {
     let localPlayer = 0
-    private let map = TileMap.defaultArena()
+    private let map: TileMap
     private let config: GameConfig
     private var current: GameState
     private var previous: GameState
 
-    init(config: GameConfig = .default, seed: UInt64 = 1) {
+    init(map: MapDefinition = Maps.default, config: GameConfig = .default, seed: UInt64 = 1) {
         self.config = config
-        let s = GameState.initial(config: config, seed: seed)
+        self.map = map.tileMap()
+        let s = GameState.initial(map: map, config: config, seed: seed)
         self.current = s
         self.previous = s
     }

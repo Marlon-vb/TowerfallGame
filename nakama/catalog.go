@@ -6,6 +6,7 @@
 package main
 
 const roundsToWin = 3 // mirrors GameConfig.roundsToWin (best of 5)
+const mapCount = 10   // mirrors the client's Maps catalog count
 
 type Cosmetic struct {
 	ID            string
@@ -15,10 +16,16 @@ type Cosmetic struct {
 
 // Order here is the display order; ids must be unique across kinds.
 var catalog = []Cosmetic{
+	// 9 characters (cosmetic skins) gated by level.
 	{ID: "skin_blue", Kind: "skin", RequiredLevel: 1},
 	{ID: "skin_red", Kind: "skin", RequiredLevel: 1},
 	{ID: "skin_green", Kind: "skin", RequiredLevel: 2},
+	{ID: "skin_purple", Kind: "skin", RequiredLevel: 3},
+	{ID: "skin_orange", Kind: "skin", RequiredLevel: 4},
 	{ID: "skin_gold", Kind: "skin", RequiredLevel: 5},
+	{ID: "skin_cyan", Kind: "skin", RequiredLevel: 6},
+	{ID: "skin_pink", Kind: "skin", RequiredLevel: 8},
+	{ID: "skin_shadow", Kind: "skin", RequiredLevel: 10},
 	{ID: "trail_white", Kind: "trail", RequiredLevel: 1},
 	{ID: "trail_fire", Kind: "trail", RequiredLevel: 3},
 	{ID: "trail_ice", Kind: "trail", RequiredLevel: 4},

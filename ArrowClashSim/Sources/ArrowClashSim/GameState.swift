@@ -28,6 +28,10 @@ public struct GameState: Equatable {
     public var round: Int          // 0-based round index
     public var winner: Int8        // -1 until matchOver, then the winning player
 
+    // Per-match constant spawn points (from the chosen map), carried so round
+    // resets are self-contained inside the tick function.
+    public var spawns: [FixedVec]
+
     public init(
         tick: UInt32,
         players: [PlayerState],
@@ -37,7 +41,8 @@ public struct GameState: Equatable {
         phaseTimer: Int32,
         scores: [Int],
         round: Int,
-        winner: Int8
+        winner: Int8,
+        spawns: [FixedVec]
     ) {
         self.tick = tick
         self.players = players
@@ -48,34 +53,35 @@ public struct GameState: Equatable {
         self.scores = scores
         self.round = round
         self.winner = winner
+        self.spawns = spawns
     }
 
-    // Builds the starting state for the default arena: two players on top of
-    // the central platform, facing each other, each with a full quiver, in the
-    // opening countdown.
-    public static func initial(config: GameConfig, seed: UInt64) -> GameState {
-        let p0 = PlayerState(
-            pos: FixedVec(x: Fixed(config.spawnX0), y: Fixed(config.spawnY)),
-            facing: 1,
-            arrows: config.startingArrows
-        )
-        let p1 = PlayerState(
-            pos: FixedVec(x: Fixed(config.spawnX1), y: Fixed(config.spawnY)),
-            facing: -1,
-            arrows: config.startingArrows
-        )
-        let capacity = config.startingArrows * 2
+    // Starting state for a specific map: players on its spawn points, facing
+    // each other, full quivers, opening countdown.
+    public static func initial(map: MapDefinition, config: GameConfig, seed: UInt64) -> GameState {
+        let spawnVecs = map.spawns.map { FixedVec(x: Fixed($0.x), y: Fixed($0.y)) }
+        var players: [PlayerState] = []
+        for (i, sp) in spawnVecs.enumerated() {
+            players.append(PlayerState(pos: sp, facing: i == 0 ? 1 : -1, arrows: config.startingArrows))
+        }
+        let capacity = config.startingArrows * max(players.count, 1)
         let arrows = [ArrowState](repeating: .empty, count: capacity)
         return GameState(
             tick: 0,
-            players: [p0, p1],
+            players: players,
             arrows: arrows,
             rng: DeterministicRandom(seed: seed),
             phase: .countdown,
             phaseTimer: config.countdownTicks,
-            scores: [0, 0],
+            scores: [Int](repeating: 0, count: players.count),
             round: 0,
-            winner: -1
+            winner: -1,
+            spawns: spawnVecs
         )
+    }
+
+    // Convenience: the default arena. Kept so existing call sites/tests work.
+    public static func initial(config: GameConfig, seed: UInt64) -> GameState {
+        return initial(map: Maps.default, config: config, seed: seed)
     }
 }

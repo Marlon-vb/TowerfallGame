@@ -27,10 +27,16 @@ struct CosmeticItem: Identifiable {
 
 enum Cosmetics {
     static let items: [CosmeticItem] = [
+        // 9 characters (cosmetic skins).
         CosmeticItem(id: "skin_blue", kind: "skin", requiredLevel: 1, color: UIColor(red: 0.30, green: 0.75, blue: 1.00, alpha: 1)),
         CosmeticItem(id: "skin_red", kind: "skin", requiredLevel: 1, color: UIColor(red: 1.00, green: 0.45, blue: 0.40, alpha: 1)),
         CosmeticItem(id: "skin_green", kind: "skin", requiredLevel: 2, color: UIColor(red: 0.40, green: 0.85, blue: 0.45, alpha: 1)),
+        CosmeticItem(id: "skin_purple", kind: "skin", requiredLevel: 3, color: UIColor(red: 0.65, green: 0.45, blue: 0.95, alpha: 1)),
+        CosmeticItem(id: "skin_orange", kind: "skin", requiredLevel: 4, color: UIColor(red: 1.00, green: 0.60, blue: 0.20, alpha: 1)),
         CosmeticItem(id: "skin_gold", kind: "skin", requiredLevel: 5, color: UIColor(red: 1.00, green: 0.84, blue: 0.20, alpha: 1)),
+        CosmeticItem(id: "skin_cyan", kind: "skin", requiredLevel: 6, color: UIColor(red: 0.35, green: 0.90, blue: 0.85, alpha: 1)),
+        CosmeticItem(id: "skin_pink", kind: "skin", requiredLevel: 8, color: UIColor(red: 1.00, green: 0.55, blue: 0.80, alpha: 1)),
+        CosmeticItem(id: "skin_shadow", kind: "skin", requiredLevel: 10, color: UIColor(red: 0.35, green: 0.35, blue: 0.42, alpha: 1)),
         CosmeticItem(id: "trail_white", kind: "trail", requiredLevel: 1, color: .white),
         CosmeticItem(id: "trail_fire", kind: "trail", requiredLevel: 3, color: UIColor(red: 1.00, green: 0.50, blue: 0.15, alpha: 1)),
         CosmeticItem(id: "trail_ice", kind: "trail", requiredLevel: 4, color: UIColor(red: 0.50, green: 0.85, blue: 1.00, alpha: 1)),

@@ -528,14 +528,13 @@ public enum Simulation {
     // Resets positions, arrows and quivers for a new round. Scores, round index,
     // and the rng carry over.
     private static func resetRound(state: inout GameState, config: GameConfig) {
-        let spawns = [config.spawnX0, config.spawnX1]
         let facings: [Int8] = [1, -1]
         var i = 0
         while i < state.players.count {
-            let x = i < spawns.count ? spawns[i] : config.spawnX0
+            let pos = i < state.spawns.count ? state.spawns[i] : FixedVec(x: Fixed(config.spawnX0), y: Fixed(config.spawnY))
             let facing = i < facings.count ? facings[i] : 1
             state.players[i] = PlayerState(
-                pos: FixedVec(x: Fixed(x), y: Fixed(config.spawnY)),
+                pos: pos,
                 facing: facing,
                 arrows: config.startingArrows
             )

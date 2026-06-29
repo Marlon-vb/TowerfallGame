@@ -6,6 +6,17 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 
 ## [Unreleased]
 
+### Content - 10 maps + 9 characters (2026-06-29)
+- Added a `Maps` catalog: 10 original 20x12 arenas (Arena, Pillars, Stairs,
+  Towers, Cross, Ledges, Bridges, Diamond, Layers, Scatter) with per-map spawns.
+- `GameState` carries its spawn points; round resets use them; `RollbackSession`
+  takes a map. The server picks a map per match and sends `mapId` in START; both
+  clients build and render the same arena (per-map color theme, render-only).
+- 9 cosmetic character skins (level-gated) on server and client.
+- Tests: `MapsTests` (all maps well-formed, deterministic, players settle).
+- Art note: all visuals are original (layouts + color palettes/themes). No
+  scraped or third-party assets.
+
 ## Phase 6 - Polish (2026-06-29)
 - Game feel (render-only, no sim/netcode impact): screen shake, hit flash, and a
   death particle burst on a kill.

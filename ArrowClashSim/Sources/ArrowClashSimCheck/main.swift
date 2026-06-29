@@ -298,6 +298,31 @@ do {
           "match ends at roundsToWin with correct winner")
 }
 
+// MARK: - Maps
+
+print("Maps")
+
+do {
+    let config = GameConfig.default
+    var allDeterministic = true
+    var allGrounded = true
+    for map in Maps.all {
+        let tiles = map.tileMap()
+        // determinism
+        var a = GameState.initial(map: map, config: config, seed: 5)
+        var b = GameState.initial(map: map, config: config, seed: 5)
+        for _ in 0..<200 {
+            Simulation.tick(state: &a, inputs: [.neutral, .neutral], map: tiles, config: config)
+            Simulation.tick(state: &b, inputs: [.neutral, .neutral], map: tiles, config: config)
+        }
+        if stateHash(a) != stateHash(b) { allDeterministic = false }
+        // grounded
+        for p in a.players where !p.onGround { allGrounded = false }
+    }
+    check(Maps.all.count == 10 && allDeterministic && allGrounded,
+          "10 maps load, are deterministic, and players settle on spawn")
+}
+
 // MARK: - Rollback netcode
 
 print("Rollback")

@@ -13,7 +13,8 @@ import ArrowClashSim
 
 final class GameScene: SKScene {
     private let config = GameConfig.default
-    private let map = TileMap.defaultArena()
+    private let map: TileMap
+    private let tileColor: SKColor
     private let input: InputBus
     private let driver: SceneDriver
 
@@ -47,21 +48,26 @@ final class GameScene: SKScene {
 
     init(input: InputBus,
          driver: SceneDriver,
+         map: MapDefinition = Maps.default,
          skinColors: [SKColor] = [SKColor(red: 0.30, green: 0.75, blue: 1.00, alpha: 1.0),
                                   SKColor(red: 1.00, green: 0.45, blue: 0.40, alpha: 1.0)],
-         trailColors: [SKColor] = [.white, .white]) {
+         trailColors: [SKColor] = [.white, .white],
+         tileColor: SKColor = SKColor(red: 0.22, green: 0.24, blue: 0.30, alpha: 1.0),
+         bgColor: SKColor = SKColor(red: 0.08, green: 0.09, blue: 0.12, alpha: 1.0)) {
         self.input = input
         self.driver = driver
+        self.map = map.tileMap()
+        self.tileColor = tileColor
         self.skinColors = skinColors
         self.trailColors = trailColors
         let worldSize = CGSize(
-            width: GameConfig.default.tileSize * TileMap.defaultArena().cols,
-            height: GameConfig.default.tileSize * TileMap.defaultArena().rows
+            width: GameConfig.default.tileSize * map.cols,
+            height: GameConfig.default.tileSize * map.rows
         )
         super.init(size: worldSize)
         self.scaleMode = .aspectFit
         self.anchorPoint = .zero
-        self.backgroundColor = SKColor(red: 0.08, green: 0.09, blue: 0.12, alpha: 1.0)
+        self.backgroundColor = bgColor
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -81,8 +87,7 @@ final class GameScene: SKScene {
         let ts = CGFloat(config.tileSize)
         for row in 0..<map.rows {
             for col in 0..<map.cols where map.isSolid(col: col, row: row) {
-                let tile = SKSpriteNode(color: SKColor(red: 0.22, green: 0.24, blue: 0.30, alpha: 1.0),
-                                        size: CGSize(width: ts, height: ts))
+                let tile = SKSpriteNode(color: tileColor, size: CGSize(width: ts, height: ts))
                 let simCx = Float(col * config.tileSize) + Float(config.tileSize) / 2
                 let simCy = Float(row * config.tileSize) + Float(config.tileSize) / 2
                 tile.position = CGPoint(x: CGFloat(simCx), y: CGFloat(worldHeightPx - simCy))

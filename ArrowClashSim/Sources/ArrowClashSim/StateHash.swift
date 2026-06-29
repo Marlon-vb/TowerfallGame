@@ -25,6 +25,10 @@ public func stateHash(_ state: GameState) -> UInt64 {
     for s in state.scores {
         mix(UInt64(bitPattern: Int64(s)))
     }
+    for sp in state.spawns {
+        mix32(sp.x.raw)
+        mix32(sp.y.raw)
+    }
     mix(UInt64(state.players.count))
 
     for p in state.players {

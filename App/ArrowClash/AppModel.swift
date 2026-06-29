@@ -42,7 +42,8 @@ final class AppModel: ObservableObject {
         mode = .local
         matchResult = nil
         let own = profileService.profile?.loadout ?? .default
-        scene = makeScene(driver: LocalDriver(), loadouts: [own, .default])
+        let map = Maps.all.randomElement() ?? Maps.default
+        scene = makeScene(driver: LocalDriver(map: map), loadouts: [own, .default], map: map)
         screen = .playing
     }
 
@@ -65,11 +66,11 @@ final class AppModel: ObservableObject {
                 self?.screen = .menu
             }
         }
-        controller.onReady = { [weak self] session, loadouts in
+        controller.onReady = { [weak self] session, loadouts, map in
             Task { @MainActor in
                 guard let self = self else { return }
                 let driver = OnlineDriver(session: session)
-                self.scene = self.makeScene(driver: driver, loadouts: loadouts)
+                self.scene = self.makeScene(driver: driver, loadouts: loadouts, map: map)
                 self.screen = .playing
             }
         }
@@ -122,13 +123,16 @@ final class AppModel: ObservableObject {
         screen = .menu
     }
 
-    private func makeScene(driver: SceneDriver, loadouts: [CosmeticLoadout]) -> GameScene {
+    private func makeScene(driver: SceneDriver, loadouts: [CosmeticLoadout], map: MapDefinition) -> GameScene {
         var ld = loadouts
         while ld.count < 2 { ld.append(.default) }
         let skins = ld.map { Cosmetics.skinColor($0.skin) }
         let trails = ld.map { Cosmetics.trailColor($0.trail) }
+        let theme = MapThemes.theme(for: map.id)
 
-        let scene = GameScene(input: input, driver: driver, skinColors: skins, trailColors: trails)
+        let scene = GameScene(input: input, driver: driver, map: map,
+                              skinColors: skins, trailColors: trails,
+                              tileColor: theme.tile, bgColor: theme.background)
         scene.onMatchEnd = { [weak self] won, kills, rounds in
             Task { @MainActor in
                 self?.matchResult = won

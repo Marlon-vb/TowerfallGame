@@ -60,6 +60,7 @@ public final class RollbackSession: NetcodeSession {
         transport: InputTransport,
         config: GameConfig,
         seed: UInt64,
+        map: MapDefinition = Maps.default,
         inputDelay: Int = 2,
         redundancy: Int = 8
     ) {
@@ -69,8 +70,8 @@ public final class RollbackSession: NetcodeSession {
         self.inputDelay = inputDelay
         self.redundancy = redundancy
 
-        self.map = TileMap.defaultArena()
-        self.states = [GameState.initial(config: config, seed: seed)]
+        self.map = map.tileMap()
+        self.states = [GameState.initial(map: map, config: config, seed: seed)]
         self.localInputs = []
         self.remoteInputs = []
         self.remoteConfirmed = []

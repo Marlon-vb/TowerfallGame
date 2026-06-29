@@ -32,6 +32,7 @@ type startPayload struct {
 	Seed     int64     `json:"seed"`
 	Order    []string  `json:"order"`    // user ids; index is the player slot
 	Loadouts []Loadout `json:"loadouts"` // aligned with order, for rendering cosmetics
+	MapID    int       `json:"mapId"`    // index into the client's Maps catalog
 }
 
 type matchState struct {
@@ -77,7 +78,8 @@ func (m *RelayMatch) MatchJoin(ctx context.Context, logger runtime.Logger, db *s
 			loadouts = append(loadouts, loadoutForUser(ctx, nk, uid))
 		}
 
-		payload, err := json.Marshal(startPayload{Seed: s.seed, Order: s.order, Loadouts: loadouts})
+		mapID := rand.Intn(mapCount)
+		payload, err := json.Marshal(startPayload{Seed: s.seed, Order: s.order, Loadouts: loadouts, MapID: mapID})
 		if err != nil {
 			logger.Error("failed to marshal start payload: %v", err)
 			return s
