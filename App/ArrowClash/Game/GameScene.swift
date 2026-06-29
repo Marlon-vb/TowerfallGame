@@ -32,9 +32,6 @@ final class GameScene: SKScene {
     private var vignetteNode = SKSpriteNode()
     private var lastCenterText = ""
 
-    private let glowTexture = TextureFactory.radialGlow(diameter: 48)
-    private var accentColor: SKColor = .white
-
     // Fired once when the match ends: (localWon, localKills, totalRounds).
     var onMatchEnd: ((Bool, Int, Int) -> Void)?
     private var matchEndFired = false
@@ -58,7 +55,6 @@ final class GameScene: SKScene {
         self.tileColor = tileColor
         self.avatars = avatars
         self.trailColors = avatars.map { Catalog.color($0.trail) }
-        self.accentColor = avatars.first.map { Catalog.color($0.trail) } ?? .white
         let worldSize = CGSize(
             width: GameConfig.default.tileSize * map.cols,
             height: GameConfig.default.tileSize * map.rows
@@ -91,29 +87,6 @@ final class GameScene: SKScene {
         gradient.position = .zero
         gradient.zPosition = -100
         addChild(gradient)
-
-        // Slow drifting motes for atmosphere.
-        let motes = SKEmitterNode()
-        motes.particleTexture = glowTexture
-        motes.position = CGPoint(x: size.width / 2, y: size.height / 2)
-        motes.particlePositionRange = CGVector(dx: size.width, dy: size.height)
-        motes.particleBirthRate = 5
-        motes.particleLifetime = 7
-        motes.particleAlpha = 0.18
-        motes.particleAlphaRange = 0.1
-        motes.particleAlphaSpeed = -0.02
-        motes.particleScale = 0.05
-        motes.particleScaleRange = 0.04
-        motes.particleSpeed = 5
-        motes.particleSpeedRange = 4
-        motes.emissionAngle = .pi / 2
-        motes.emissionAngleRange = .pi
-        motes.particleColor = accentColor
-        motes.particleColorBlendFactor = 1
-        motes.particleBlendMode = .add
-        motes.zPosition = -90
-        motes.advanceSimulationTime(7)
-        addChild(motes)
     }
 
     private func buildVignette() {
