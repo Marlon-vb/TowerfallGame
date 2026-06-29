@@ -25,8 +25,6 @@ final class GameScene: SKScene {
     private let world = SKNode() // everything that can shake
     private var playerNodes: [SKNode] = []
     private var arrowNodes: [SKShapeNode] = []
-    private var arrowGlows: [SKSpriteNode] = []
-    private var arrowEmitters: [SKEmitterNode] = []
     private var hud = SKLabelNode()
     private var scoreLabel = SKLabelNode()
     private var centerLabel = SKLabelNode()
@@ -44,7 +42,6 @@ final class GameScene: SKScene {
     // Per-player avatar (layered look) and resolved colors.
     private let avatars: [Avatar]
     private var trailColors: [SKColor]
-    private var skinAura: [SKColor]
 
     private var worldWidthPx: Float { Float(map.cols * config.tileSize) }
     private var worldHeightPx: Float { Float(map.rows * config.tileSize) }
@@ -61,7 +58,6 @@ final class GameScene: SKScene {
         self.tileColor = tileColor
         self.avatars = avatars
         self.trailColors = avatars.map { Catalog.color($0.trail) }
-        self.skinAura = avatars.map { Catalog.color($0.skin) }
         self.accentColor = avatars.first.map { Catalog.color($0.trail) } ?? .white
         let worldSize = CGSize(
             width: GameConfig.default.tileSize * map.cols,
@@ -129,21 +125,6 @@ final class GameScene: SKScene {
         addChild(vignetteNode)
     }
 
-    private func makeTrailEmitter() -> SKEmitterNode {
-        let e = SKEmitterNode()
-        e.particleTexture = glowTexture
-        e.particleBirthRate = 0
-        e.particleLifetime = 0.35
-        e.particleAlpha = 0.85
-        e.particleAlphaSpeed = -2.4
-        e.particleScale = 0.13
-        e.particleScaleSpeed = -0.25
-        e.particleColorBlendFactor = 1
-        e.particleBlendMode = .add
-        e.particleSpeed = 0
-        return e
-    }
-
     // MARK: - Build
 
     private func buildTiles() {
@@ -166,36 +147,14 @@ final class GameScene: SKScene {
         for i in 0..<state.players.count {
             let avatar = i < avatars.count ? avatars[i] : .default
             let node = AvatarRenderer.build(avatar: avatar, width: w, height: h, isLocal: i == driver.localPlayer)
-            // Soft aura behind the player.
-            let aura = SKSpriteNode(texture: glowTexture)
-            aura.size = CGSize(width: w * 2.6, height: h * 2.2)
-            aura.color = i < skinAura.count ? skinAura[i] : .white
-            aura.colorBlendFactor = 1
-            aura.blendMode = .add
-            aura.alpha = 0.22
-            aura.zPosition = -2
-            node.addChild(aura)
             world.addChild(node)
             playerNodes.append(node)
         }
-        for i in 0..<state.arrows.count {
+        for _ in 0..<state.arrows.count {
             let node = SKShapeNode(rectOf: CGSize(width: 8, height: 2), cornerRadius: 1)
             node.fillColor = .white
             node.strokeColor = .clear
             node.isHidden = true
-            // Glow head.
-            let glow = SKSpriteNode(texture: glowTexture)
-            glow.size = CGSize(width: 14, height: 14)
-            glow.colorBlendFactor = 1
-            glow.blendMode = .add
-            glow.alpha = 0.7
-            node.addChild(glow)
-            arrowGlows.append(glow)
-            // Trail emitter (stays in world space behind the arrow).
-            let emitter = makeTrailEmitter()
-            node.addChild(emitter)
-            emitter.targetNode = world
-            arrowEmitters.append(emitter)
             world.addChild(node)
             arrowNodes.append(node)
         }
@@ -408,13 +367,7 @@ final class GameScene: SKScene {
             node.position = skPoint(cx, cy)
             node.zRotation = arrowRotation(cur)
             let owner = Int(cur.owner)
-            let color = (owner >= 0 && owner < trailColors.count) ? trailColors[owner] : SKColor.white
-            node.fillColor = color
-            if a < arrowGlows.count { arrowGlows[a].color = color }
-            if a < arrowEmitters.count {
-                arrowEmitters[a].particleColor = color
-                arrowEmitters[a].particleBirthRate = (cur.active && !cur.stuck) ? 140 : 0
-            }
+            node.fillColor = (owner >= 0 && owner < trailColors.count) ? trailColors[owner] : SKColor.white
         }
 
         let me = driver.localPlayer
