@@ -10,6 +10,7 @@
 
 import Foundation
 import ArrowClashSim
+import ArrowClashNet
 
 // MARK: - Tiny check harness
 
@@ -226,6 +227,50 @@ do {
     check(state.players[0].arrows == config.startingArrows
           && state.arrows.filter { $0.active }.count == 0,
           "player reclaims a stuck arrow walked over")
+}
+
+// MARK: - Rollback netcode
+
+print("Rollback")
+
+do {
+    // No latency, no loss: both sessions track the reference closely.
+    let r = RollbackHarness.run(.init(frames: 600, latency: 0, seed: 1))
+    check(r.matchedReference && r.maxConfirmed >= 600 - 10,
+          "no-latency sessions match reference at every confirmed frame")
+}
+
+do {
+    // Latency well above input delay: rollbacks must occur, and confirmed
+    // frames must still match the reference exactly.
+    let r = RollbackHarness.run(.init(frames: 600, inputDelay: 2, latency: 6, seed: 2))
+    check(r.matchedReference
+          && r.maxConfirmed >= 600 - 16
+          && r.rollbacksA > 0 && r.rollbacksB > 0,
+          "latency causes rollbacks but confirmed frames still match (rollbacks A=\(r.rollbacksA) B=\(r.rollbacksB))")
+}
+
+do {
+    // Latency + jitter + 20% packet loss: redundancy recovers losses; confirmed
+    // frames still match the reference.
+    let r = RollbackHarness.run(.init(frames: 800, inputDelay: 2, latency: 5, jitter: 3, lossPerThousand: 200, seed: 3))
+    check(r.matchedReference && r.maxConfirmed >= 800 - 60,
+          "lossy/jittery link still matches reference at confirmed frames (confirmed=\(r.maxConfirmed)/800)")
+}
+
+do {
+    // Fuzz: many seeds and conditions, all must match the reference.
+    var allMatched = true
+    var worstConfirmed = Int.max
+    for seed in UInt64(1)...UInt64(40) {
+        let latency = Int(seed % 8)
+        let loss = UInt32((seed * 37) % 250)
+        let r = RollbackHarness.run(.init(frames: 400, inputDelay: 2, latency: latency, jitter: Int(seed % 4), lossPerThousand: loss, seed: seed))
+        if !r.matchedReference { allMatched = false; break }
+        worstConfirmed = min(worstConfirmed, r.maxConfirmed)
+    }
+    check(allMatched && worstConfirmed >= 400 - 80,
+          "fuzz: 40 randomized scenarios all match reference (worst confirmed=\(worstConfirmed)/400)")
 }
 
 // MARK: - Summary

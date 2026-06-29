@@ -6,19 +6,24 @@ rollback netcode.
 
 This repository is being built in phases. See `docs/` for the per-phase notes.
 
-## Current status: Phase 1 (local render harness)
+## Current status: Phase 2 (rollback netcode, offline)
 
-The deterministic sim (standalone Swift package, zero UIKit/SpriteKit deps) now
-includes arrows (shoot + reclaim). A SpriteKit scene renders the sim and feeds
-it local touch input so one character can be played in the arena. See
-`docs/PHASE1.md`. Phase 0's determinism gate still holds.
+`ArrowClashNet` adds GGPO-style rollback (behind swappable `NetcodeSession` and
+`InputTransport` protocols) on top of the deterministic sim. Two sim instances
+stay in sync under simulated latency, jitter and packet loss, proven headlessly
+against a full-information reference replay. See `docs/PHASE2.md`.
+
+Earlier: Phase 0 (deterministic sim), Phase 1 (arrows + SpriteKit local play
+harness). See `docs/`.
 
 ## Layout
 
 ```
-ArrowClashSim/                 Swift package: the deterministic simulation
+ArrowClashSim/                 Swift package: sim + netcode
   Sources/ArrowClashSim/       Fixed-point math, state, tick, collision, hash
-  Tests/ArrowClashSimTests/    Determinism + movement unit tests
+  Sources/ArrowClashNet/       Rollback netcode (sim-dependent, no UIKit/SpriteKit)
+  Tests/ArrowClashSimTests/    Determinism + movement + combat tests
+  Tests/ArrowClashNetTests/    Rollback correctness + fuzz tests
 App/                           iOS app target (SwiftUI shell for now)
   project.yml                  XcodeGen spec -> generates ArrowClash.xcodeproj
   ArrowClash/                  App sources
