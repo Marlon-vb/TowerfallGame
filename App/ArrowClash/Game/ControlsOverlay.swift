@@ -29,18 +29,23 @@ struct ControlsOverlay: View {
     }
 
     private var actionButtons: some View {
-        VStack(alignment: .trailing, spacing: 14) {
-            HStack(spacing: 14) {
-                IconHoldButton(systemName: "hare.fill",
-                               onPress: { input.dashHeld = true },
-                               onRelease: { input.dashHeld = false })
-                IconHoldButton(systemName: "arrow.up.circle.fill",
-                               onPress: { input.jumpHeld = true },
-                               onRelease: { input.jumpHeld = false })
-            }
+        // Cluster: Fire (big) bottom-right, Jump above it, Dash to its upper-left.
+        ZStack(alignment: .bottomTrailing) {
+            Color.clear.frame(width: 160, height: 180)
+
             IconTapButton(systemName: "scope") {
                 input.requestShoot(aim: input.aim)
             }
+
+            IconHoldButton(systemName: "arrow.up.circle.fill",
+                           onPress: { input.jumpHeld = true },
+                           onRelease: { input.jumpHeld = false })
+                .offset(x: 0, y: -98)
+
+            IconHoldButton(systemName: "hare.fill",
+                           onPress: { input.dashHeld = true },
+                           onRelease: { input.dashHeld = false })
+                .offset(x: -78, y: -56)
         }
     }
 }
