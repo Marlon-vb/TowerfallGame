@@ -18,7 +18,7 @@ struct ContentView: View {
             if let scene = model.scene {
                 GameView(scene: scene, model: model)
             } else {
-                MenuView(model: model)
+                MenuView(model: model, profileService: model.profileService)
             }
         }
     }
