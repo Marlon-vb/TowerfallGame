@@ -18,6 +18,35 @@ public enum Simulation {
         map: TileMap,
         config: GameConfig
     ) {
+        switch state.phase {
+        case .countdown:
+            advanceFrozen(state: &state, map: map, config: config)
+            state.phaseTimer -= 1
+            if state.phaseTimer <= 0 {
+                state.phase = .playing
+            }
+        case .playing:
+            advancePlaying(state: &state, inputs: inputs, map: map, config: config)
+            resolveDeaths(state: &state, config: config)
+        case .roundOver:
+            advanceFrozen(state: &state, map: map, config: config)
+            state.phaseTimer -= 1
+            if state.phaseTimer <= 0 {
+                advanceRoundOrMatch(state: &state, config: config)
+            }
+        case .matchOver:
+            break // fully frozen
+        }
+        state.tick &+= 1
+    }
+
+    // Live gameplay: step players with their inputs, then arrows.
+    private static func advancePlaying(
+        state: inout GameState,
+        inputs: [InputCommand],
+        map: TileMap,
+        config: GameConfig
+    ) {
         let count = state.players.count
 
         // Capture each player's previous buttons before stepping, because step
@@ -36,8 +65,20 @@ public enum Simulation {
         }
 
         updateArrows(state: &state, inputs: inputs, priorButtons: priorButtons, map: map, config: config)
+    }
 
-        state.tick &+= 1
+    // Countdown / round-over: players are frozen but gravity still settles them
+    // onto the ground. Inputs and arrows are ignored.
+    private static func advanceFrozen(
+        state: inout GameState,
+        map: TileMap,
+        config: GameConfig
+    ) {
+        var i = 0
+        while i < state.players.count {
+            step(player: &state.players[i], input: .neutral, map: map, config: config)
+            i += 1
+        }
     }
 
     // MARK: - Per-player step
@@ -398,5 +439,112 @@ public enum Simulation {
         let bottom = p.pos.y + config.playerHeight
         return point.x.raw >= left.raw && point.x.raw < right.raw
             && point.y.raw >= top.raw && point.y.raw < bottom.raw
+    }
+
+    // MARK: - Death and round resolution
+    //
+    // One-hit kill: a flying arrow that overlaps a player (other than its owner)
+    // kills that player; a player who descends onto another's head stomps and
+    // kills them. When a death occurs the round ends: the survivor (if exactly
+    // one) scores. A double kill scores for no one.
+
+    private static func resolveDeaths(state: inout GameState, config: GameConfig) {
+        // Arrows.
+        var a = 0
+        while a < state.arrows.count {
+            if state.arrows[a].active && !state.arrows[a].stuck {
+                var pi = 0
+                while pi < state.players.count {
+                    if state.players[pi].alive
+                        && Int8(pi) != state.arrows[a].owner
+                        && pointInPlayer(state.arrows[a].pos, player: state.players[pi], config: config) {
+                        state.players[pi].alive = false
+                        state.arrows[a].active = false
+                    }
+                    pi += 1
+                }
+            }
+            a += 1
+        }
+
+        // Stomp (exactly two players in v1).
+        if state.players.count == 2 && state.players[0].alive && state.players[1].alive {
+            if aabbOverlap(state.players[0], state.players[1], config: config) {
+                let c0 = state.players[0].pos.y + config.playerHeight / Fixed(2)
+                let c1 = state.players[1].pos.y + config.playerHeight / Fixed(2)
+                // Upper player (smaller y) descending onto the other stomps it.
+                if c0.raw < c1.raw && state.players[0].vel.y.raw > 0 {
+                    state.players[1].alive = false
+                    state.players[0].vel.y = -config.stompBounceSpeed
+                } else if c1.raw < c0.raw && state.players[1].vel.y.raw > 0 {
+                    state.players[0].alive = false
+                    state.players[1].vel.y = -config.stompBounceSpeed
+                }
+            }
+        }
+
+        // Did anyone die? End the round if so.
+        var aliveCount = 0
+        var lastAlive = -1
+        var pi = 0
+        while pi < state.players.count {
+            if state.players[pi].alive {
+                aliveCount += 1
+                lastAlive = pi
+            }
+            pi += 1
+        }
+
+        if aliveCount < state.players.count {
+            if aliveCount == 1 {
+                state.scores[lastAlive] += 1
+            }
+            // aliveCount == 0 is a double kill: no score.
+            state.phase = .roundOver
+            state.phaseTimer = config.roundOverTicks
+        }
+    }
+
+    private static func aabbOverlap(_ a: PlayerState, _ b: PlayerState, config: GameConfig) -> Bool {
+        let aLeft = a.pos.x.raw, aRight = (a.pos.x + config.playerWidth).raw
+        let aTop = a.pos.y.raw, aBottom = (a.pos.y + config.playerHeight).raw
+        let bLeft = b.pos.x.raw, bRight = (b.pos.x + config.playerWidth).raw
+        let bTop = b.pos.y.raw, bBottom = (b.pos.y + config.playerHeight).raw
+        return aLeft < bRight && aRight > bLeft && aTop < bBottom && aBottom > bTop
+    }
+
+    private static func advanceRoundOrMatch(state: inout GameState, config: GameConfig) {
+        if state.scores[0] >= config.roundsToWin || state.scores[1] >= config.roundsToWin {
+            state.phase = .matchOver
+            state.winner = state.scores[0] >= config.roundsToWin ? 0 : 1
+        } else {
+            state.round += 1
+            resetRound(state: &state, config: config)
+            state.phase = .countdown
+            state.phaseTimer = config.countdownTicks
+        }
+    }
+
+    // Resets positions, arrows and quivers for a new round. Scores, round index,
+    // and the rng carry over.
+    private static func resetRound(state: inout GameState, config: GameConfig) {
+        let spawns = [config.spawnX0, config.spawnX1]
+        let facings: [Int8] = [1, -1]
+        var i = 0
+        while i < state.players.count {
+            let x = i < spawns.count ? spawns[i] : config.spawnX0
+            let facing = i < facings.count ? facings[i] : 1
+            state.players[i] = PlayerState(
+                pos: FixedVec(x: Fixed(x), y: Fixed(config.spawnY)),
+                facing: facing,
+                arrows: config.startingArrows
+            )
+            i += 1
+        }
+        var a = 0
+        while a < state.arrows.count {
+            state.arrows[a] = .empty
+            a += 1
+        }
     }
 }

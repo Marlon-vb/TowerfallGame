@@ -18,6 +18,13 @@ public func stateHash(_ state: GameState) -> UInt64 {
 
     mix(UInt64(state.tick))
     mix(state.rng.state)
+    mix(UInt64(UInt32(bitPattern: Int32(state.phase.rawValue))))
+    mix32(state.phaseTimer)
+    mix(UInt64(bitPattern: Int64(state.round)))
+    mix(UInt64(UInt8(bitPattern: state.winner)))
+    for s in state.scores {
+        mix(UInt64(bitPattern: Int64(s)))
+    }
     mix(UInt64(state.players.count))
 
     for p in state.players {
@@ -33,6 +40,7 @@ public func stateHash(_ state: GameState) -> UInt64 {
         mix32(p.dashCooldownTimer)
         mix(UInt64(p.prevButtons))
         mix(UInt64(bitPattern: Int64(p.arrows)))
+        mix(p.alive ? 1 : 0)
     }
 
     mix(UInt64(state.arrows.count))

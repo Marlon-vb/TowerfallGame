@@ -6,14 +6,16 @@ rollback netcode.
 
 This repository is being built in phases. See `docs/` for the per-phase notes.
 
-## Current status: Phase 3 (Nakama online 1v1)
+## Current status: Phase 4 (match flow)
 
-Local Nakama (docker-compose + Go relay module) provides device auth,
-matchmaking, and a relayed match that carries per-tick inputs into the rollback
-system. Two clients match and play a synced 1v1. See `docs/PHASE3.md`.
+Rounds, countdown, one-hit death (arrow + stomp), best-of-5 scoring, match win,
+and a post-match rematch/leave screen. The whole lifecycle is in the
+deterministic sim so it rolls back, and it is proven headlessly. See
+`docs/PHASE4.md`.
 
 Earlier: Phase 0 (deterministic sim), Phase 1 (arrows + SpriteKit local play),
-Phase 2 (rollback netcode, offline-proven). See `docs/`.
+Phase 2 (rollback netcode, offline-proven), Phase 3 (Nakama online 1v1). See
+`docs/`.
 
 ## Layout
 

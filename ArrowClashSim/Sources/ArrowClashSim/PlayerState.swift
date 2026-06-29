@@ -19,6 +19,7 @@ public struct PlayerState: Equatable, Hashable {
     public var prevButtons: UInt8      // last tick's buttons, for press/release edge detection
 
     public var arrows: Int             // arrows currently in the quiver
+    public var alive: Bool             // false once hit; one-hit kill
 
     public init(
         pos: FixedVec,
@@ -30,7 +31,8 @@ public struct PlayerState: Equatable, Hashable {
         dashActiveTimer: Int32 = 0,
         dashCooldownTimer: Int32 = 0,
         prevButtons: UInt8 = 0,
-        arrows: Int = 0
+        arrows: Int = 0,
+        alive: Bool = true
     ) {
         self.pos = pos
         self.vel = vel
@@ -42,5 +44,6 @@ public struct PlayerState: Equatable, Hashable {
         self.dashCooldownTimer = dashCooldownTimer
         self.prevButtons = prevButtons
         self.arrows = arrows
+        self.alive = alive
     }
 }

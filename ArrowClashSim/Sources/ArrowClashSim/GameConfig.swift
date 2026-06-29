@@ -52,6 +52,12 @@ public struct GameConfig: Equatable {
     public var arrowMaxFallSpeed: Fixed // terminal fall speed for arrows
     public var arrowSpawnOffset: Fixed  // distance from player center to spawn the arrow
 
+    // Match flow (Phase 4).
+    public var countdownTicks: Int32    // freeze before a round begins
+    public var roundOverTicks: Int32    // brief result pause after a death
+    public var roundsToWin: Int         // first to this many round wins the match (best of 5 -> 3)
+    public var stompBounceSpeed: Fixed  // upward velocity given to a successful stomper
+
     // Spawn points for the default arena (see TileMap.defaultArena).
     // Both spawn on top of the central platform.
     public var spawnX0: Int
@@ -82,6 +88,10 @@ public struct GameConfig: Equatable {
         arrowGravity: Fixed = Fixed(numerator: 1, denominator: 5), // 0.2
         arrowMaxFallSpeed: Fixed = Fixed(8),                     // 8.0
         arrowSpawnOffset: Fixed = Fixed(8),                      // 8 px ahead of center
+        countdownTicks: Int32 = 90,                              // ~1.5s
+        roundOverTicks: Int32 = 120,                             // ~2.0s
+        roundsToWin: Int = 3,                                    // best of 5
+        stompBounceSpeed: Fixed = Fixed(5),                      // 5.0
         spawnX0: Int = 112,
         spawnX1: Int = 192,
         spawnY: Int = 82
@@ -109,6 +119,10 @@ public struct GameConfig: Equatable {
         self.arrowGravity = arrowGravity
         self.arrowMaxFallSpeed = arrowMaxFallSpeed
         self.arrowSpawnOffset = arrowSpawnOffset
+        self.countdownTicks = countdownTicks
+        self.roundOverTicks = roundOverTicks
+        self.roundsToWin = roundsToWin
+        self.stompBounceSpeed = stompBounceSpeed
         self.spawnX0 = spawnX0
         self.spawnX1 = spawnX1
         self.spawnY = spawnY

@@ -119,6 +119,7 @@ do {
     let map = TileMap.defaultArena()
     let config = GameConfig.default
     var state = GameState.initial(config: config, seed: 1)
+    state.phase = .playing
     state.players[0].pos.y = Fixed(40)
     for _ in 0..<180 {
         Simulation.tick(state: &state, inputs: neutral, map: map, config: config)
@@ -134,6 +135,7 @@ do {
     let map = emptyMap()
     let config = GameConfig.default
     var state = GameState.initial(config: config, seed: 1)
+    state.phase = .playing
     let right = InputCommand(buttons: [.right])
     var overshot = false
     for _ in 0..<60 {
@@ -151,6 +153,7 @@ do {
     let map = TileMap.defaultArena()
     let config = GameConfig.default
     var state = GameState.initial(config: config, seed: 1)
+    state.phase = .playing
     let dash = InputCommand(buttons: [.dash])
 
     Simulation.tick(state: &state, inputs: [dash, .neutral], map: map, config: config)
@@ -175,6 +178,7 @@ do {
     let map = TileMap.defaultArena()
     let config = GameConfig.default
     var state = GameState.initial(config: config, seed: 1)
+    state.phase = .playing
     for _ in 0..<10 {
         Simulation.tick(state: &state, inputs: neutral, map: map, config: config)
     }
@@ -194,6 +198,7 @@ do {
     let map = TileMap.defaultArena()
     let config = GameConfig.default
     var state = GameState.initial(config: config, seed: 1)
+    state.phase = .playing
 
     // Aim right (dir 0). Shoot on press edge.
     let shoot = InputCommand(buttons: [.shoot], aim: 0)
@@ -213,6 +218,7 @@ do {
     let map = TileMap.defaultArena()
     let config = GameConfig.default
     var state = GameState.initial(config: config, seed: 1)
+    state.phase = .playing
 
     // Put a stuck arrow inside player 0's AABB and open a quiver slot.
     let center = FixedVec(
@@ -227,6 +233,69 @@ do {
     check(state.players[0].arrows == config.startingArrows
           && state.arrows.filter { $0.active }.count == 0,
           "player reclaims a stuck arrow walked over")
+}
+
+// MARK: - Match flow
+
+print("Match flow")
+
+do {
+    // Countdown freezes input, then transitions to playing.
+    let map = TileMap.defaultArena()
+    let config = GameConfig.default
+    var state = GameState.initial(config: config, seed: 1)
+    let right = InputCommand(buttons: [.right])
+    let startX = state.players[0].pos.x
+    for _ in 0..<Int(config.countdownTicks) {
+        Simulation.tick(state: &state, inputs: [right, .neutral], map: map, config: config)
+    }
+    check(state.phase == .playing && state.players[0].pos.x == startX,
+          "countdown freezes input then starts the round")
+}
+
+do {
+    // An arrow kill scores and ends the round; after roundOver a new round
+    // starts with players respawned and scores carried over.
+    let map = TileMap.defaultArena()
+    let config = GameConfig.default
+    var state = GameState.initial(config: config, seed: 1)
+    state.phase = .playing
+    let center = FixedVec(
+        x: state.players[1].pos.x + config.playerWidth / Fixed(2),
+        y: state.players[1].pos.y + config.playerHeight / Fixed(2)
+    )
+    state.arrows[0] = ArrowState(pos: center, active: true, stuck: false, owner: 0, dir: 0)
+
+    Simulation.tick(state: &state, inputs: [.neutral, .neutral], map: map, config: config)
+    let scoredAndEnded = !state.players[1].alive && state.scores[0] == 1 && state.phase == .roundOver
+
+    for _ in 0..<Int(config.roundOverTicks) {
+        Simulation.tick(state: &state, inputs: [.neutral, .neutral], map: map, config: config)
+    }
+    let reset = state.phase == .countdown && state.round == 1 && state.scores[0] == 1
+        && state.players[1].alive && state.arrows.filter { $0.active }.count == 0
+
+    check(scoredAndEnded && reset, "arrow kill scores, ends round, then resets")
+}
+
+do {
+    // Reaching roundsToWin ends the match.
+    let map = TileMap.defaultArena()
+    let config = GameConfig.default
+    var state = GameState.initial(config: config, seed: 1)
+    state.phase = .playing
+    state.scores[0] = config.roundsToWin - 1
+    let center = FixedVec(
+        x: state.players[1].pos.x + config.playerWidth / Fixed(2),
+        y: state.players[1].pos.y + config.playerHeight / Fixed(2)
+    )
+    state.arrows[0] = ArrowState(pos: center, active: true, stuck: false, owner: 0, dir: 0)
+    Simulation.tick(state: &state, inputs: [.neutral, .neutral], map: map, config: config)
+    for _ in 0..<Int(config.roundOverTicks) {
+        Simulation.tick(state: &state, inputs: [.neutral, .neutral], map: map, config: config)
+    }
+    check(state.phase == .matchOver && state.winner == 0,
+          "match ends at roundsToWin with correct winner")
 }
 
 // MARK: - Rollback netcode

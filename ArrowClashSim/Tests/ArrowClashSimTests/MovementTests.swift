@@ -18,6 +18,7 @@ final class MovementTests: XCTestCase {
         let config = GameConfig.default
 
         var state = GameState.initial(config: config, seed: 1)
+        state.phase = .playing // these tests exercise live gameplay, skip countdown
         // Lift player 0 above the platform; keep x over the platform.
         state.players[0].pos.y = Fixed(40)
 
@@ -37,6 +38,7 @@ final class MovementTests: XCTestCase {
         let config = GameConfig.default
 
         var state = GameState.initial(config: config, seed: 1)
+        state.phase = .playing // these tests exercise live gameplay, skip countdown
         let right = InputCommand(buttons: [.right])
 
         for _ in 0..<60 {
@@ -55,6 +57,7 @@ final class MovementTests: XCTestCase {
         let config = GameConfig.default
 
         var state = GameState.initial(config: config, seed: 1)
+        state.phase = .playing // these tests exercise live gameplay, skip countdown
         let dash = InputCommand(buttons: [.dash])
 
         // Tick 0: dash press (player 0 faces right by default).
@@ -82,6 +85,7 @@ final class MovementTests: XCTestCase {
         let config = GameConfig.default
 
         var state = GameState.initial(config: config, seed: 1)
+        state.phase = .playing // these tests exercise live gameplay, skip countdown
         // Settle onto the platform first.
         for _ in 0..<10 {
             Simulation.tick(state: &state, inputs: neutral(), map: map, config: config)

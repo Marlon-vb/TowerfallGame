@@ -12,7 +12,7 @@ struct ContentView: View {
             MenuView(model: model)
         case .playing:
             if let scene = model.scene {
-                GameView(scene: scene, input: model.input, onLeave: { model.leave() })
+                GameView(scene: scene, model: model)
             } else {
                 MenuView(model: model)
             }

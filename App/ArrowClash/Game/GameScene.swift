@@ -24,6 +24,12 @@ final class GameScene: SKScene {
     private var playerNodes: [SKShapeNode] = []
     private var arrowNodes: [SKShapeNode] = []
     private var hud = SKLabelNode()
+    private var scoreLabel = SKLabelNode()
+    private var centerLabel = SKLabelNode()
+
+    // Fired once when the match ends; argument is whether the local player won.
+    var onMatchEnd: ((Bool) -> Void)?
+    private var matchEndFired = false
 
     private var worldWidthPx: Float { Float(map.cols * config.tileSize) }
     private var worldHeightPx: Float { Float(map.rows * config.tileSize) }
@@ -100,6 +106,22 @@ final class GameScene: SKScene {
         hud.verticalAlignmentMode = .top
         hud.position = CGPoint(x: 6, y: CGFloat(worldHeightPx) - 4)
         addChild(hud)
+
+        scoreLabel.fontName = "Menlo-Bold"
+        scoreLabel.fontSize = 14
+        scoreLabel.fontColor = .white
+        scoreLabel.horizontalAlignmentMode = .center
+        scoreLabel.verticalAlignmentMode = .top
+        scoreLabel.position = CGPoint(x: CGFloat(worldWidthPx) / 2, y: CGFloat(worldHeightPx) - 4)
+        addChild(scoreLabel)
+
+        centerLabel.fontName = "Menlo-Bold"
+        centerLabel.fontSize = 22
+        centerLabel.fontColor = .white
+        centerLabel.horizontalAlignmentMode = .center
+        centerLabel.verticalAlignmentMode = .center
+        centerLabel.position = CGPoint(x: CGFloat(worldWidthPx) / 2, y: CGFloat(worldHeightPx) * 0.62)
+        addChild(centerLabel)
     }
 
     // MARK: - Loop
@@ -129,6 +151,7 @@ final class GameScene: SKScene {
         for i in 0..<playerNodes.count where i < current.players.count {
             let pPrev = previous.players[i]
             let pCur = current.players[i]
+            playerNodes[i].isHidden = !pCur.alive
             let cx = interp(pPrev.pos.x.toFloat + halfW, pCur.pos.x.toFloat + halfW, alpha, worldWidthPx)
             let cy = interp(pPrev.pos.y.toFloat + halfH, pCur.pos.y.toFloat + halfH, alpha, worldHeightPx)
             playerNodes[i].position = skPoint(cx, cy)
@@ -159,6 +182,31 @@ final class GameScene: SKScene {
         let me = driver.localPlayer
         if me < current.players.count {
             hud.text = "Arrows: \(current.players[me].arrows)/\(config.startingArrows)"
+        }
+
+        updateMatchLabels(current)
+    }
+
+    private func updateMatchLabels(_ state: GameState) {
+        if state.scores.count >= 2 {
+            scoreLabel.text = "\(state.scores[0])   -   \(state.scores[1])"
+        }
+
+        switch state.phase {
+        case .countdown:
+            let secondsLeft = Int((Double(state.phaseTimer) / 30.0).rounded(.up))
+            centerLabel.text = secondsLeft > 0 ? "\(secondsLeft)" : "GO"
+        case .playing:
+            centerLabel.text = ""
+        case .roundOver:
+            centerLabel.text = "ROUND OVER"
+        case .matchOver:
+            let localWon = state.winner == Int8(driver.localPlayer)
+            centerLabel.text = localWon ? "YOU WIN" : "YOU LOSE"
+            if !matchEndFired {
+                matchEndFired = true
+                onMatchEnd?(localWon)
+            }
         }
     }
 

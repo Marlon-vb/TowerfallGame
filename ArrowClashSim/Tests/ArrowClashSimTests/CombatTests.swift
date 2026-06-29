@@ -9,6 +9,7 @@ final class CombatTests: XCTestCase {
         let map = TileMap.defaultArena()
         let config = GameConfig.default
         var state = GameState.initial(config: config, seed: 1)
+        state.phase = .playing
 
         let shoot = InputCommand(buttons: [.shoot], aim: 0) // aim right
         Simulation.tick(state: &state, inputs: [shoot, .neutral], map: map, config: config)
@@ -24,6 +25,7 @@ final class CombatTests: XCTestCase {
         let map = TileMap.defaultArena()
         let config = GameConfig.default
         var state = GameState.initial(config: config, seed: 1)
+        state.phase = .playing
 
         // Holding shoot for several ticks should fire exactly once (edge), not
         // drain the whole quiver.
@@ -39,6 +41,7 @@ final class CombatTests: XCTestCase {
         let map = TileMap.defaultArena()
         let config = GameConfig.default
         var state = GameState.initial(config: config, seed: 1)
+        state.phase = .playing
 
         let center = FixedVec(
             x: state.players[0].pos.x + config.playerWidth / Fixed(2),
@@ -57,6 +60,7 @@ final class CombatTests: XCTestCase {
         let map = TileMap.defaultArena()
         let config = GameConfig.default
         var state = GameState.initial(config: config, seed: 1)
+        state.phase = .playing
 
         let center = FixedVec(
             x: state.players[0].pos.x + config.playerWidth / Fixed(2),

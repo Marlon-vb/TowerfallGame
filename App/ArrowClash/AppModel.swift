@@ -14,21 +14,33 @@ final class AppModel: ObservableObject {
         case playing
     }
 
+    enum Mode {
+        case local
+        case online
+    }
+
     @Published var screen: Screen = .menu
     @Published var statusText: String = ""
+    // nil while a match is in progress; set to win/lose when the match ends.
+    @Published var matchResult: Bool?
 
     let input = InputBus()
     private(set) var scene: GameScene?
 
     private var controller: OnlineMatchController?
+    private var mode: Mode = .local
 
     func startLocalPractice() {
+        mode = .local
+        matchResult = nil
         let driver = LocalDriver()
-        scene = GameScene(input: input, driver: driver)
+        scene = makeScene(driver: driver)
         screen = .playing
     }
 
     func findOnlineMatch() {
+        mode = .online
+        matchResult = nil
         statusText = "Connecting..."
         screen = .searching
 
@@ -48,17 +60,38 @@ final class AppModel: ObservableObject {
             Task { @MainActor in
                 guard let self = self else { return }
                 let driver = OnlineDriver(session: session)
-                self.scene = GameScene(input: self.input, driver: driver)
+                self.scene = self.makeScene(driver: driver)
                 self.screen = .playing
             }
         }
         controller.start()
     }
 
+    func rematch() {
+        matchResult = nil
+        switch mode {
+        case .online:
+            controller?.leave()
+            controller = nil
+            findOnlineMatch()
+        case .local:
+            startLocalPractice()
+        }
+    }
+
     func leave() {
         controller?.leave()
         controller = nil
         scene = nil
+        matchResult = nil
         screen = .menu
+    }
+
+    private func makeScene(driver: SceneDriver) -> GameScene {
+        let scene = GameScene(input: input, driver: driver)
+        scene.onMatchEnd = { [weak self] localWon in
+            Task { @MainActor in self?.matchResult = localWon }
+        }
+        return scene
     }
 }
