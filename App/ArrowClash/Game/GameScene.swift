@@ -23,8 +23,10 @@ final class GameScene: SKScene {
     private var lastTime: TimeInterval = 0
 
     private let world = SKNode() // everything that can shake
-    private var playerNodes: [SKNode] = []
+    private var playerNodes: [AnimatedAvatarNode] = []
     private var arrowNodes: [SKShapeNode] = []
+    private let spriteProvider: SpriteProvider = PlaceholderSpriteProvider.shared
+    private static let runThreshold: Int32 = 20000 // ~0.3 px/tick in Q16.16
     private var hud = SKLabelNode()
     private var scoreLabel = SKLabelNode()
     private var centerLabel = SKLabelNode()
@@ -119,7 +121,8 @@ final class GameScene: SKScene {
         let h = CGFloat(config.playerHeight.toFloat)
         for i in 0..<state.players.count {
             let avatar = i < avatars.count ? avatars[i] : .default
-            let node = AvatarRenderer.build(avatar: avatar, width: w, height: h, isLocal: i == driver.localPlayer)
+            let node = AnimatedAvatarNode(avatar: avatar, provider: spriteProvider,
+                                          width: w, height: h, isLocal: i == driver.localPlayer)
             world.addChild(node)
             playerNodes.append(node)
         }
@@ -192,7 +195,7 @@ final class GameScene: SKScene {
             detectEvents(previous: states.previous, current: states.current)
         }
 
-        renderInterpolated(alpha: Float(accumulator / tickDuration))
+        renderInterpolated(alpha: Float(accumulator / tickDuration), dt: frameDelta)
     }
 
     // MARK: - Juice (render-only)
@@ -229,10 +232,22 @@ final class GameScene: SKScene {
 
         let arrowCount = min(previous.arrows.count, current.arrows.count)
         for i in 0..<arrowCount {
-            if !previous.arrows[i].active && current.arrows[i].active && Int(current.arrows[i].owner) == me {
-                AudioManager.shared.play("shoot", on: self)
+            if !previous.arrows[i].active && current.arrows[i].active {
+                let owner = Int(current.arrows[i].owner)
+                if owner == me { AudioManager.shared.play("shoot", on: self) }
+                if owner >= 0 && owner < playerNodes.count {
+                    playerNodes[owner].playOneShot(.shoot, duration: 0.14)
+                }
             }
         }
+    }
+
+    private static func animState(for p: PlayerState) -> AnimState {
+        if !p.alive { return .die }
+        if p.dashActiveTimer > 0 { return .dash }
+        if !p.onGround { return p.vel.y.raw < 0 ? .jump : .fall }
+        if abs(p.vel.x.raw) > runThreshold { return .run }
+        return .idle
     }
 
     private func onDeath(player: PlayerState) {
@@ -300,7 +315,7 @@ final class GameScene: SKScene {
 
     // MARK: - Render
 
-    private func renderInterpolated(alpha: Float) {
+    private func renderInterpolated(alpha: Float, dt: TimeInterval) {
         let (previous, current) = driver.renderStates()
         let halfW = config.playerWidth.toFloat / 2
         let halfH = config.playerHeight.toFloat / 2
@@ -308,15 +323,18 @@ final class GameScene: SKScene {
         for i in 0..<playerNodes.count where i < current.players.count {
             let pPrev = previous.players[i]
             let pCur = current.players[i]
-            playerNodes[i].isHidden = !pCur.alive
+            let node = playerNodes[i]
             let cx = interp(pPrev.pos.x.toFloat + halfW, pCur.pos.x.toFloat + halfW, alpha, worldWidthPx)
             let cy = interp(pPrev.pos.y.toFloat + halfH, pCur.pos.y.toFloat + halfH, alpha, worldHeightPx)
-            playerNodes[i].position = skPoint(cx, cy)
-            // Squash on the ground, stretch with vertical speed.
+            node.position = skPoint(cx, cy)
+            // Facing flip + squash on ground / stretch with vertical speed.
+            let facingSign: CGFloat = pCur.facing >= 0 ? 1 : -1
             let vy = abs(pCur.vel.y.toFloat)
-            let yScale: CGFloat = pCur.onGround ? 0.9 : CGFloat(1.0 + min(0.30, vy * 0.025))
-            playerNodes[i].yScale = yScale
-            playerNodes[i].xScale = 1.0 / yScale
+            let yScale: CGFloat = pCur.onGround ? 0.92 : CGFloat(1.0 + min(0.28, vy * 0.022))
+            node.yScale = yScale
+            node.xScale = facingSign * (1.0 / yScale)
+            node.setBaseState(Self.animState(for: pCur))
+            node.update(CGFloat(dt))
         }
 
         for a in 0..<arrowNodes.count where a < current.arrows.count {

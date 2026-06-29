@@ -6,6 +6,17 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 
 ## [Unreleased]
 
+### Layered sprite pipeline - animated characters (2026-06-29)
+- Characters now animate via a layered, tintable sprite system (steps 1-5 of
+  docs/SPRITE_PIPELINE.md). Render-only; sim/netcode untouched.
+- `SpriteProvider` protocol with `PlaceholderSpriteProvider` (procedural
+  animated grayscale part-frames, cached + tinted by item color). Swap for an
+  atlas provider when real art arrives.
+- `AnimatedAvatarNode` composites per-part layers on a shared timeline; base
+  state from sim (idle/run/jump/fall/dash/die) + shoot one-shot; facing flip +
+  squash/stretch.
+- GameScene drives animation from the synced sim state.
+
 ### Visual juice + atmosphere (2026-06-29)
 - Procedural `TextureFactory` (radial glow, gradients, vignette) - no asset files.
 - Atmosphere: per-map gradient background + drifting motes; full-screen vignette.
