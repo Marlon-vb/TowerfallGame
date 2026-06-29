@@ -10,6 +10,8 @@
 //   u16 count
 //   count * (u8 buttons, u8 aim)
 
+import ArrowClashSim
+
 public enum PacketCodec {
 
     public static func encode(_ packet: InputPacket) -> [UInt8] {

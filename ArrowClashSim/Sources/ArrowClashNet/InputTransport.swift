@@ -8,6 +8,8 @@
 // sender's most recent inputs, so a dropped packet is recovered by the next one
 // as long as consecutive losses stay within the window.
 
+import ArrowClashSim
+
 public struct InputPacket: Equatable {
     public var player: Int          // which player these inputs belong to
     public var startFrame: Int      // frame index of inputs[0]
