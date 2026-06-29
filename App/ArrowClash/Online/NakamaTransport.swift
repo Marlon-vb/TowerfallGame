@@ -44,7 +44,7 @@ final class NakamaTransport: InputTransport {
         let id = matchId
         let socket = self.socket
         Task {
-            try? await socket.sendMatchData(matchId: id, opCode: MatchOpCode.input, data: Data(bytes))
+            try? await socket.sendMatchData(matchId: id, opCode: MatchOpCode.input, data: Data(bytes), presences: nil)
         }
     }
 
