@@ -1,8 +1,14 @@
 // ControlsOverlay.swift
-// On-screen touch controls drawn over the SpriteKit view. Left thumb is a move
-// joystick; right side has Jump/Dash buttons and an aim joystick that fires on
-// release. All of this writes into the InputBus; none of it touches the sim
-// directly. Floats here are fine (input layer only).
+// Touch controls drawn over the SpriteKit view.
+//
+// Left: a single joystick that BOTH moves and aims. Its horizontal component
+// drives left/right movement; its full direction sets the aim used when firing.
+// Releasing it stops movement but keeps the last aim.
+//
+// Right: icon buttons for Dash, Jump and Fire. Dash/Jump are press-and-hold;
+// Fire shoots on press in the current aim direction.
+//
+// All of this writes into the InputBus; none of it touches the sim directly.
 
 import SwiftUI
 
@@ -13,37 +19,36 @@ struct ControlsOverlay: View {
         VStack {
             Spacer()
             HStack(alignment: .bottom) {
-                Joystick(radius: 56,
-                         label: "MOVE",
-                         onChange: { v in
-                             input.moveX = v.dx > 0.35 ? 1 : (v.dx < -0.35 ? -1 : 0)
-                         },
-                         onEnd: { _ in input.moveX = 0 })
+                MoveAimJoystick(input: input, radius: 60)
                 Spacer()
-                VStack(alignment: .trailing, spacing: 14) {
-                    HStack(spacing: 14) {
-                        PressButton(label: "DASH",
-                                    onPress: { input.dashHeld = true },
-                                    onRelease: { input.dashHeld = false })
-                        PressButton(label: "JUMP",
-                                    onPress: { input.jumpHeld = true },
-                                    onRelease: { input.jumpHeld = false })
-                    }
-                    AimStick(input: input)
-                }
+                actionButtons
             }
             .padding(28)
         }
         .allowsHitTesting(true)
     }
+
+    private var actionButtons: some View {
+        VStack(alignment: .trailing, spacing: 14) {
+            HStack(spacing: 14) {
+                IconHoldButton(systemName: "hare.fill",
+                               onPress: { input.dashHeld = true },
+                               onRelease: { input.dashHeld = false })
+                IconHoldButton(systemName: "arrow.up.circle.fill",
+                               onPress: { input.jumpHeld = true },
+                               onRelease: { input.jumpHeld = false })
+            }
+            IconTapButton(systemName: "scope") {
+                input.requestShoot(aim: input.aim)
+            }
+        }
+    }
 }
 
-// Move joystick.
-private struct Joystick: View {
+// Combined move + aim joystick.
+private struct MoveAimJoystick: View {
+    let input: InputBus
     let radius: CGFloat
-    let label: String
-    let onChange: (CGVector) -> Void
-    let onEnd: (CGVector) -> Void
 
     @State private var thumb: CGSize = .zero
 
@@ -53,49 +58,9 @@ private struct Joystick: View {
             Circle().fill(Color.white.opacity(0.20))
                 .frame(width: radius, height: radius)
                 .offset(thumb)
-            Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(.white.opacity(0.6))
-        }
-        .frame(width: radius * 2, height: radius * 2)
-        .contentShape(Circle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    let dx = value.translation.width
-                    let dy = value.translation.height
-                    let length = max(1, (dx * dx + dy * dy).squareRoot())
-                    let clamped = min(length, radius)
-                    let cx = dx / length * clamped
-                    let cy = dy / length * clamped
-                    thumb = CGSize(width: cx, height: cy)
-                    onChange(CGVector(dx: cx / radius, dy: cy / radius))
-                }
-                .onEnded { _ in
-                    let v = CGVector(dx: thumb.width / radius, dy: thumb.height / radius)
-                    thumb = .zero
-                    onEnd(v)
-                }
-        )
-    }
-}
-
-// Aim joystick: tracks aim while dragging, fires on release.
-private struct AimStick: View {
-    let input: InputBus
-    let radius: CGFloat = 56
-
-    @State private var thumb: CGSize = .zero
-
-    var body: some View {
-        ZStack {
-            Circle().fill(Color.white.opacity(0.08))
-            Circle().fill(Color(red: 0.95, green: 0.8, blue: 0.3).opacity(0.5))
-                .frame(width: radius, height: radius)
-                .offset(thumb)
-            Text("AIM / FIRE")
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(.white.opacity(0.7))
+            Image(systemName: "dpad.fill")
+                .font(.system(size: 16))
+                .foregroundColor(.white.opacity(0.5))
         }
         .frame(width: radius * 2, height: radius * 2)
         .contentShape(Circle())
@@ -107,45 +72,60 @@ private struct AimStick: View {
                     let length = max(1, (dx * dx + dy * dy).squareRoot())
                     let clamped = min(length, radius)
                     thumb = CGSize(width: dx / length * clamped, height: dy / length * clamped)
-                    if abs(dx) + abs(dy) > 8 {
+
+                    let nx = dx / radius
+                    input.moveX = nx > 0.35 ? 1 : (nx < -0.35 ? -1 : 0)
+                    if abs(dx) + abs(dy) > 10 {
                         input.aim = aimByte(dx: Double(dx), dy: Double(dy))
                     }
                 }
-                .onEnded { value in
-                    let dx = Double(value.translation.width)
-                    let dy = Double(value.translation.height)
-                    let dir = (abs(dx) + abs(dy) > 8) ? aimByte(dx: dx, dy: dy) : input.aim
+                .onEnded { _ in
                     thumb = .zero
-                    input.requestShoot(aim: dir)
+                    input.moveX = 0 // stop moving; keep last aim
                 }
         )
     }
 }
 
-// Press-and-hold button: held is true between press and release.
-private struct PressButton: View {
-    let label: String
+// Press-and-hold icon button (Dash, Jump).
+private struct IconHoldButton: View {
+    let systemName: String
     let onPress: () -> Void
     let onRelease: () -> Void
 
     @State private var pressed = false
 
     var body: some View {
-        Text(label)
-            .font(.system(size: 13, weight: .bold))
+        Image(systemName: systemName)
+            .font(.system(size: 26, weight: .bold))
             .foregroundColor(.white)
             .frame(width: 66, height: 66)
-            .background(
-                Circle().fill(Color.white.opacity(pressed ? 0.35 : 0.15))
-            )
+            .background(Circle().fill(Color.white.opacity(pressed ? 0.35 : 0.15)))
             .gesture(
                 DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        if !pressed { pressed = true; onPress() }
-                    }
-                    .onEnded { _ in
-                        pressed = false; onRelease()
-                    }
+                    .onChanged { _ in if !pressed { pressed = true; onPress() } }
+                    .onEnded { _ in pressed = false; onRelease() }
+            )
+    }
+}
+
+// Tap icon button that fires once on press (Fire).
+private struct IconTapButton: View {
+    let systemName: String
+    let action: () -> Void
+
+    @State private var pressed = false
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 30, weight: .bold))
+            .foregroundColor(.white)
+            .frame(width: 78, height: 78)
+            .background(Circle().fill(Color(red: 0.95, green: 0.8, blue: 0.3).opacity(pressed ? 0.55 : 0.30)))
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in if !pressed { pressed = true; action() } }
+                    .onEnded { _ in pressed = false }
             )
     }
 }
