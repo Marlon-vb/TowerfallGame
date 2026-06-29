@@ -25,18 +25,26 @@ final class GameScene: SKScene {
     private let world = SKNode() // everything that can shake
     private var playerNodes: [SKNode] = []
     private var arrowNodes: [SKShapeNode] = []
+    private var arrowGlows: [SKSpriteNode] = []
+    private var arrowEmitters: [SKEmitterNode] = []
     private var hud = SKLabelNode()
     private var scoreLabel = SKLabelNode()
     private var centerLabel = SKLabelNode()
     private var flash = SKSpriteNode()
+    private var vignetteNode = SKSpriteNode()
+    private var lastCenterText = ""
+
+    private let glowTexture = TextureFactory.radialGlow(diameter: 48)
+    private var accentColor: SKColor = .white
 
     // Fired once when the match ends: (localWon, localKills, totalRounds).
     var onMatchEnd: ((Bool, Int, Int) -> Void)?
     private var matchEndFired = false
 
-    // Per-player avatar (layered look) and resolved arrow-trail colors.
+    // Per-player avatar (layered look) and resolved colors.
     private let avatars: [Avatar]
     private var trailColors: [SKColor]
+    private var skinAura: [SKColor]
 
     private var worldWidthPx: Float { Float(map.cols * config.tileSize) }
     private var worldHeightPx: Float { Float(map.rows * config.tileSize) }
@@ -53,6 +61,8 @@ final class GameScene: SKScene {
         self.tileColor = tileColor
         self.avatars = avatars
         self.trailColors = avatars.map { Catalog.color($0.trail) }
+        self.skinAura = avatars.map { Catalog.color($0.skin) }
+        self.accentColor = avatars.first.map { Catalog.color($0.trail) } ?? .white
         let worldSize = CGSize(
             width: GameConfig.default.tileSize * map.cols,
             height: GameConfig.default.tileSize * map.rows
@@ -66,12 +76,72 @@ final class GameScene: SKScene {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     override func didMove(to view: SKView) {
+        buildBackground()
         addChild(world)
         buildTiles()
         buildEntities()
+        buildVignette()
         buildHUD()
         buildFlash()
         AudioManager.shared.preload()
+    }
+
+    private func buildBackground() {
+        let size = CGSize(width: CGFloat(worldWidthPx), height: CGFloat(worldHeightPx))
+        let top = backgroundColor.adjustBrightness(1.8)
+        let bottom = backgroundColor.adjustBrightness(0.6)
+        let gradient = SKSpriteNode(texture: TextureFactory.verticalGradient(top: top, bottom: bottom, size: size))
+        gradient.anchorPoint = .zero
+        gradient.position = .zero
+        gradient.zPosition = -100
+        addChild(gradient)
+
+        // Slow drifting motes for atmosphere.
+        let motes = SKEmitterNode()
+        motes.particleTexture = glowTexture
+        motes.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        motes.particlePositionRange = CGVector(dx: size.width, dy: size.height)
+        motes.particleBirthRate = 5
+        motes.particleLifetime = 7
+        motes.particleAlpha = 0.18
+        motes.particleAlphaRange = 0.1
+        motes.particleAlphaSpeed = -0.02
+        motes.particleScale = 0.05
+        motes.particleScaleRange = 0.04
+        motes.particleSpeed = 5
+        motes.particleSpeedRange = 4
+        motes.emissionAngle = .pi / 2
+        motes.emissionAngleRange = .pi
+        motes.particleColor = accentColor
+        motes.particleColorBlendFactor = 1
+        motes.particleBlendMode = .add
+        motes.zPosition = -90
+        motes.advanceSimulationTime(7)
+        addChild(motes)
+    }
+
+    private func buildVignette() {
+        let size = CGSize(width: CGFloat(worldWidthPx), height: CGFloat(worldHeightPx))
+        vignetteNode = SKSpriteNode(texture: TextureFactory.vignette(size: size))
+        vignetteNode.anchorPoint = .zero
+        vignetteNode.position = .zero
+        vignetteNode.zPosition = 50
+        addChild(vignetteNode)
+    }
+
+    private func makeTrailEmitter() -> SKEmitterNode {
+        let e = SKEmitterNode()
+        e.particleTexture = glowTexture
+        e.particleBirthRate = 0
+        e.particleLifetime = 0.35
+        e.particleAlpha = 0.85
+        e.particleAlphaSpeed = -2.4
+        e.particleScale = 0.13
+        e.particleScaleSpeed = -0.25
+        e.particleColorBlendFactor = 1
+        e.particleBlendMode = .add
+        e.particleSpeed = 0
+        return e
     }
 
     // MARK: - Build
@@ -96,14 +166,36 @@ final class GameScene: SKScene {
         for i in 0..<state.players.count {
             let avatar = i < avatars.count ? avatars[i] : .default
             let node = AvatarRenderer.build(avatar: avatar, width: w, height: h, isLocal: i == driver.localPlayer)
+            // Soft aura behind the player.
+            let aura = SKSpriteNode(texture: glowTexture)
+            aura.size = CGSize(width: w * 2.6, height: h * 2.2)
+            aura.color = i < skinAura.count ? skinAura[i] : .white
+            aura.colorBlendFactor = 1
+            aura.blendMode = .add
+            aura.alpha = 0.22
+            aura.zPosition = -2
+            node.addChild(aura)
             world.addChild(node)
             playerNodes.append(node)
         }
-        for _ in 0..<state.arrows.count {
-            let node = SKShapeNode(rectOf: CGSize(width: 7, height: 2))
-            node.fillColor = SKColor(red: 0.95, green: 0.9, blue: 0.5, alpha: 1.0)
+        for i in 0..<state.arrows.count {
+            let node = SKShapeNode(rectOf: CGSize(width: 8, height: 2), cornerRadius: 1)
+            node.fillColor = .white
             node.strokeColor = .clear
             node.isHidden = true
+            // Glow head.
+            let glow = SKSpriteNode(texture: glowTexture)
+            glow.size = CGSize(width: 14, height: 14)
+            glow.colorBlendFactor = 1
+            glow.blendMode = .add
+            glow.alpha = 0.7
+            node.addChild(glow)
+            arrowGlows.append(glow)
+            // Trail emitter (stays in world space behind the arrow).
+            let emitter = makeTrailEmitter()
+            node.addChild(emitter)
+            emitter.targetNode = world
+            arrowEmitters.append(emitter)
             world.addChild(node)
             arrowNodes.append(node)
         }
@@ -116,6 +208,7 @@ final class GameScene: SKScene {
         hud.horizontalAlignmentMode = .left
         hud.verticalAlignmentMode = .top
         hud.position = CGPoint(x: 6, y: CGFloat(worldHeightPx) - 4)
+        hud.zPosition = 60
         addChild(hud)
 
         scoreLabel.fontName = "Menlo-Bold"
@@ -124,6 +217,7 @@ final class GameScene: SKScene {
         scoreLabel.horizontalAlignmentMode = .center
         scoreLabel.verticalAlignmentMode = .top
         scoreLabel.position = CGPoint(x: CGFloat(worldWidthPx) / 2, y: CGFloat(worldHeightPx) - 4)
+        scoreLabel.zPosition = 60
         addChild(scoreLabel)
 
         centerLabel.fontName = "Menlo-Bold"
@@ -132,6 +226,7 @@ final class GameScene: SKScene {
         centerLabel.horizontalAlignmentMode = .center
         centerLabel.verticalAlignmentMode = .center
         centerLabel.position = CGPoint(x: CGFloat(worldWidthPx) / 2, y: CGFloat(worldHeightPx) * 0.62)
+        centerLabel.zPosition = 60
         addChild(centerLabel)
     }
 
@@ -181,6 +276,12 @@ final class GameScene: SKScene {
             if previous.players[i].alive && !current.players[i].alive {
                 onDeath(player: current.players[i])
             }
+            // Landing dust (either player).
+            if !previous.players[i].onGround && current.players[i].onGround {
+                let cx = current.players[i].pos.x.toFloat + config.playerWidth.toFloat / 2
+                let cy = current.players[i].pos.y.toFloat + config.playerHeight.toFloat
+                spawnDust(at: skPoint(cx, cy))
+            }
         }
 
         if me < count {
@@ -204,11 +305,31 @@ final class GameScene: SKScene {
 
     private func onDeath(player: PlayerState) {
         AudioManager.shared.play("hit", on: self)
-        shakeScreen(intensity: 7)
+        shakeScreen(intensity: 8)
         triggerFlash()
+        // Quick zoom punch for impact (render-only; world is frozen in roundOver).
+        world.run(.sequence([
+            SKAction.scale(to: 1.07, duration: 0.05),
+            SKAction.scale(to: 1.0, duration: 0.16),
+        ]))
         let cx = player.pos.x.toFloat + config.playerWidth.toFloat / 2
         let cy = player.pos.y.toFloat + config.playerHeight.toFloat / 2
         spawnDeathParticles(at: skPoint(cx, cy))
+    }
+
+    private func spawnDust(at point: CGPoint) {
+        for _ in 0..<6 {
+            let p = SKShapeNode(circleOfRadius: 1.5)
+            p.fillColor = SKColor(white: 0.8, alpha: 0.7)
+            p.strokeColor = .clear
+            p.position = point
+            p.zPosition = 40
+            world.addChild(p)
+            let dx = CGFloat.random(in: -10...10)
+            let move = SKAction.moveBy(x: dx, y: CGFloat.random(in: 2...8), duration: 0.3)
+            move.timingMode = .easeOut
+            p.run(.sequence([.group([move, .fadeOut(withDuration: 0.3)]), .removeFromParent()]))
+        }
     }
 
     private func shakeScreen(intensity: CGFloat) {
@@ -259,6 +380,11 @@ final class GameScene: SKScene {
             let cx = interp(pPrev.pos.x.toFloat + halfW, pCur.pos.x.toFloat + halfW, alpha, worldWidthPx)
             let cy = interp(pPrev.pos.y.toFloat + halfH, pCur.pos.y.toFloat + halfH, alpha, worldHeightPx)
             playerNodes[i].position = skPoint(cx, cy)
+            // Squash on the ground, stretch with vertical speed.
+            let vy = abs(pCur.vel.y.toFloat)
+            let yScale: CGFloat = pCur.onGround ? 0.9 : CGFloat(1.0 + min(0.30, vy * 0.025))
+            playerNodes[i].yScale = yScale
+            playerNodes[i].xScale = 1.0 / yScale
         }
 
         for a in 0..<arrowNodes.count where a < current.arrows.count {
@@ -282,8 +408,12 @@ final class GameScene: SKScene {
             node.position = skPoint(cx, cy)
             node.zRotation = arrowRotation(cur)
             let owner = Int(cur.owner)
-            if owner >= 0 && owner < trailColors.count {
-                node.fillColor = trailColors[owner]
+            let color = (owner >= 0 && owner < trailColors.count) ? trailColors[owner] : SKColor.white
+            node.fillColor = color
+            if a < arrowGlows.count { arrowGlows[a].color = color }
+            if a < arrowEmitters.count {
+                arrowEmitters[a].particleColor = color
+                arrowEmitters[a].particleBirthRate = (cur.active && !cur.stuck) ? 140 : 0
             }
         }
 
@@ -298,6 +428,19 @@ final class GameScene: SKScene {
     private func updateMatchLabels(_ state: GameState) {
         if state.scores.count >= 2 {
             scoreLabel.text = "\(state.scores[0])   -   \(state.scores[1])"
+        }
+
+        // Punch-scale the center label whenever its text changes.
+        defer {
+            let text = centerLabel.text ?? ""
+            if text != lastCenterText {
+                lastCenterText = text
+                if !text.isEmpty {
+                    centerLabel.removeAllActions()
+                    centerLabel.setScale(1.7)
+                    centerLabel.run(.scale(to: 1.0, duration: 0.25))
+                }
+            }
         }
 
         switch state.phase {

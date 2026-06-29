@@ -10,11 +10,16 @@ struct MenuView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.06, green: 0.07, blue: 0.10).ignoresSafeArea()
+            LinearGradient(colors: [Color(red: 0.10, green: 0.11, blue: 0.18),
+                                    Color(red: 0.04, green: 0.04, blue: 0.07)],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
             VStack(spacing: 22) {
                 Text("ArrowClash")
-                    .font(.system(size: 44, weight: .heavy))
+                    .font(.system(size: 46, weight: .heavy))
                     .foregroundColor(.white)
+                    .shadow(color: Color.cyan.opacity(0.7), radius: 12)
+                    .shadow(color: Color.blue.opacity(0.5), radius: 24)
 
                 if let profile = profileService.profile {
                     Text("Level \(profile.level)   -   \(profile.xp) XP   -   \(profile.coins) coins")

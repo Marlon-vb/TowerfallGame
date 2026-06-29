@@ -6,6 +6,17 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 
 ## [Unreleased]
 
+### Visual juice + atmosphere (2026-06-29)
+- Procedural `TextureFactory` (radial glow, gradients, vignette) - no asset files.
+- Atmosphere: per-map gradient background + drifting motes; full-screen vignette.
+- Signature lighting: additive glow auras on players; glowing arrow heads +
+  particle trails colored by the equipped trail cosmetic.
+- Motion: squash-and-stretch avatar, landing dust, death zoom-punch (render-only),
+  punch-scale countdown.
+- UI: gradient menu with glowing title.
+- Added docs/ART_DIRECTION.md (palette, style decision, real-art pipeline,
+  license-safe sourcing). All current visuals are original; sim/netcode untouched.
+
 ### Character creator + store (2026-06-29)
 - Replaced single-skin cosmetics with a layered avatar: skin tone, hair color,
   shirt, pants, head accessory, and arrow trail. Rendered as original blocky art
