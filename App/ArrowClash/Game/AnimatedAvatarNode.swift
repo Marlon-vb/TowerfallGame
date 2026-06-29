@@ -14,7 +14,7 @@ final class AnimatedAvatarNode: SKNode {
 
     private var baseState: AnimState = .idle
     private var currentState: AnimState = .idle
-    private var frame = 0
+    private var frameIndex = 0
     private var frameTimer: CGFloat = 0
     private var oneShotRemaining: CGFloat = 0
 
@@ -57,7 +57,7 @@ final class AnimatedAvatarNode: SKNode {
 
     func playOneShot(_ state: AnimState, duration: CGFloat) {
         currentState = state
-        frame = 0
+        frameIndex = 0
         frameTimer = 0
         oneShotRemaining = duration
         applyFrame()
@@ -68,12 +68,12 @@ final class AnimatedAvatarNode: SKNode {
             oneShotRemaining -= dt
             if oneShotRemaining <= 0 {
                 currentState = baseState
-                frame = 0
+                frameIndex = 0
                 frameTimer = 0
             }
         } else if currentState != baseState {
             currentState = baseState
-            frame = 0
+            frameIndex = 0
             frameTimer = 0
         }
 
@@ -84,9 +84,9 @@ final class AnimatedAvatarNode: SKNode {
             while frameTimer >= secondsPerFrame {
                 frameTimer -= secondsPerFrame
                 if provider.isLooping(state: currentState) {
-                    frame = (frame + 1) % count
+                    frameIndex = (frameIndex + 1) % count
                 } else {
-                    frame = min(frame + 1, count - 1)
+                    frameIndex = min(frameIndex + 1, count - 1)
                 }
             }
         }
@@ -96,7 +96,7 @@ final class AnimatedAvatarNode: SKNode {
     private func applyFrame() {
         for (layer, sprite) in layers {
             let id = layer.itemId(in: avatar)
-            if let texture = provider.texture(part: layer, itemId: id, state: currentState, frame: frame) {
+            if let texture = provider.texture(part: layer, itemId: id, state: currentState, frame: frameIndex) {
                 sprite.texture = texture
                 sprite.size = displaySize
                 sprite.isHidden = false
