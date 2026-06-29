@@ -21,11 +21,13 @@ final class GameScene: SKScene {
     private var accumulator: TimeInterval = 0
     private var lastTime: TimeInterval = 0
 
+    private let world = SKNode() // everything that can shake
     private var playerNodes: [SKShapeNode] = []
     private var arrowNodes: [SKShapeNode] = []
     private var hud = SKLabelNode()
     private var scoreLabel = SKLabelNode()
     private var centerLabel = SKLabelNode()
+    private var flash = SKSpriteNode()
 
     // Fired once when the match ends: (localWon, localKills, totalRounds).
     var onMatchEnd: ((Bool, Int, Int) -> Void)?
@@ -65,9 +67,12 @@ final class GameScene: SKScene {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     override func didMove(to view: SKView) {
+        addChild(world)
         buildTiles()
         buildEntities()
         buildHUD()
+        buildFlash()
+        AudioManager.shared.preload()
     }
 
     // MARK: - Build
@@ -81,7 +86,7 @@ final class GameScene: SKScene {
                 let simCx = Float(col * config.tileSize) + Float(config.tileSize) / 2
                 let simCy = Float(row * config.tileSize) + Float(config.tileSize) / 2
                 tile.position = CGPoint(x: CGFloat(simCx), y: CGFloat(worldHeightPx - simCy))
-                addChild(tile)
+                world.addChild(tile)
             }
         }
     }
@@ -95,7 +100,7 @@ final class GameScene: SKScene {
             node.fillColor = i < skinColors.count ? skinColors[i] : playerColors[i % playerColors.count]
             node.strokeColor = (i == driver.localPlayer) ? .white : .clear
             node.lineWidth = 1
-            addChild(node)
+            world.addChild(node)
             playerNodes.append(node)
         }
         for _ in 0..<state.arrows.count {
@@ -103,7 +108,7 @@ final class GameScene: SKScene {
             node.fillColor = SKColor(red: 0.95, green: 0.9, blue: 0.5, alpha: 1.0)
             node.strokeColor = .clear
             node.isHidden = true
-            addChild(node)
+            world.addChild(node)
             arrowNodes.append(node)
         }
     }
@@ -134,6 +139,15 @@ final class GameScene: SKScene {
         addChild(centerLabel)
     }
 
+    private func buildFlash() {
+        flash = SKSpriteNode(color: .white, size: CGSize(width: CGFloat(worldWidthPx), height: CGFloat(worldHeightPx)))
+        flash.anchorPoint = .zero
+        flash.position = .zero
+        flash.alpha = 0
+        flash.zPosition = 1000
+        addChild(flash)
+    }
+
     // MARK: - Loop
 
     override func update(_ currentTime: TimeInterval) {
@@ -143,12 +157,96 @@ final class GameScene: SKScene {
         if frameDelta > 0.25 { frameDelta = 0.25 }
 
         accumulator += frameDelta
+        var didTick = false
         while accumulator >= tickDuration {
             driver.advance(localInput: input.consumeForTick())
             accumulator -= tickDuration
+            didTick = true
+        }
+
+        if didTick {
+            let states = driver.renderStates()
+            detectEvents(previous: states.previous, current: states.current)
         }
 
         renderInterpolated(alpha: Float(accumulator / tickDuration))
+    }
+
+    // MARK: - Juice (render-only)
+
+    // Compares the last tick's before/after states to fire sounds and effects.
+    // Movement sounds are local-player only (those inputs aren't predicted, so
+    // they don't flicker under rollback); death effects fire for either player.
+    private func detectEvents(previous: GameState, current: GameState) {
+        let me = driver.localPlayer
+
+        let count = min(previous.players.count, current.players.count)
+        for i in 0..<count {
+            if previous.players[i].alive && !current.players[i].alive {
+                onDeath(player: current.players[i])
+            }
+        }
+
+        if me < count {
+            let before = previous.players[me]
+            let after = current.players[me]
+            if before.dashActiveTimer == 0 && after.dashActiveTimer > 0 {
+                AudioManager.shared.play("dash", on: self)
+            }
+            if before.onGround && !after.onGround && after.vel.y.raw < 0 {
+                AudioManager.shared.play("jump", on: self)
+            }
+        }
+
+        let arrowCount = min(previous.arrows.count, current.arrows.count)
+        for i in 0..<arrowCount {
+            if !previous.arrows[i].active && current.arrows[i].active && Int(current.arrows[i].owner) == me {
+                AudioManager.shared.play("shoot", on: self)
+            }
+        }
+    }
+
+    private func onDeath(player: PlayerState) {
+        AudioManager.shared.play("hit", on: self)
+        shakeScreen(intensity: 7)
+        triggerFlash()
+        let cx = player.pos.x.toFloat + config.playerWidth.toFloat / 2
+        let cy = player.pos.y.toFloat + config.playerHeight.toFloat / 2
+        spawnDeathParticles(at: skPoint(cx, cy))
+    }
+
+    private func shakeScreen(intensity: CGFloat) {
+        var steps: [SKAction] = []
+        for _ in 0..<6 {
+            let dx = CGFloat.random(in: -intensity...intensity)
+            let dy = CGFloat.random(in: -intensity...intensity)
+            steps.append(.move(to: CGPoint(x: dx, y: dy), duration: 0.02))
+        }
+        steps.append(.move(to: .zero, duration: 0.02))
+        world.run(.sequence(steps))
+    }
+
+    private func triggerFlash() {
+        flash.removeAllActions()
+        flash.alpha = 0.5
+        flash.run(.fadeOut(withDuration: 0.18))
+    }
+
+    private func spawnDeathParticles(at point: CGPoint) {
+        for _ in 0..<14 {
+            let p = SKShapeNode(rectOf: CGSize(width: 3, height: 3))
+            p.fillColor = SKColor(red: 1.0, green: 0.85, blue: 0.4, alpha: 1.0)
+            p.strokeColor = .clear
+            p.position = point
+            p.zPosition = 50
+            world.addChild(p)
+            let angle = CGFloat.random(in: 0...(2 * .pi))
+            let dist = CGFloat.random(in: 14...34)
+            let move = SKAction.move(by: CGVector(dx: cos(angle) * dist, dy: sin(angle) * dist), duration: 0.4)
+            move.timingMode = .easeOut
+            let group = SKAction.group([move, .fadeOut(withDuration: 0.4)])
+            p.run(.sequence([group, .removeFromParent()]))
+        }
     }
 
     // MARK: - Render

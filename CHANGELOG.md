@@ -6,6 +6,16 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 
 ## [Unreleased]
 
+## Phase 6 - Polish (2026-06-29)
+- Game feel (render-only, no sim/netcode impact): screen shake, hit flash, and a
+  death particle burst on a kill.
+- Audio: generated WAV blips (shoot, jump, dash, hit, ui) + `AudioManager`;
+  movement sounds fire for the local player, the hit sound on any death.
+- Event detection diffs each tick's before/after state to trigger sounds/FX.
+- Settings screen: sound toggle and server host (set a LAN IP for device play
+  without code changes), persisted in UserDefaults.
+- Menu cleanup: shows level/XP, adds Loadout and Settings entries.
+
 ## Phase 5 - Progression (2026-06-29)
 - Server-authoritative Go runtime: `match_end`, `get_profile`, `set_loadout`
   RPCs; profile stored in Nakama storage with server-only write permission;

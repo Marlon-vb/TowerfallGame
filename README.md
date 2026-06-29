@@ -6,16 +6,16 @@ rollback netcode.
 
 This repository is being built in phases. See `docs/` for the per-phase notes.
 
-## Current status: Phase 5 (progression)
+## Current status: Phase 6 (polish) - v1 feature-complete
 
-Server-authoritative XP/levels, a level-gated cosmetic catalog, an XP
-leaderboard, a loadout screen, and cosmetics shown in-match for both players.
-Progression writes are server-only (forged client writes rejected). See
-`docs/PHASE5.md`.
+Game feel (screen shake, hit flash, death particles), audio with a sound toggle,
+a settings screen (incl. server host for device play), and menu cleanup. All
+six planned phases are in. See `docs/PHASE6.md`.
 
 Earlier: Phase 0 (deterministic sim), Phase 1 (arrows + SpriteKit local play),
 Phase 2 (rollback netcode, offline-proven), Phase 3 (Nakama online 1v1),
-Phase 4 (match flow). See `docs/` and `CHANGELOG.md`.
+Phase 4 (match flow), Phase 5 (server-authoritative progression). See `docs/`
+and `CHANGELOG.md`.
 
 ## Layout
 

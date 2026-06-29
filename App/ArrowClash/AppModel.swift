@@ -12,6 +12,7 @@ final class AppModel: ObservableObject {
     enum Screen {
         case menu
         case loadout
+        case settings
         case searching
         case playing
     }
@@ -33,6 +34,10 @@ final class AppModel: ObservableObject {
     private var controller: OnlineMatchController?
     private var mode: Mode = .local
 
+    init() {
+        profileService.serverHost = Settings.serverHost
+    }
+
     func startLocalPractice() {
         mode = .local
         matchResult = nil
@@ -48,6 +53,7 @@ final class AppModel: ObservableObject {
         screen = .searching
 
         let controller = OnlineMatchController()
+        controller.serverHost = Settings.serverHost
         self.controller = controller
 
         controller.onStatus = { [weak self] text in
@@ -71,12 +77,29 @@ final class AppModel: ObservableObject {
     }
 
     func openLoadout() {
+        profileService.serverHost = Settings.serverHost
         screen = .loadout
         Task { await profileService.refresh() }
     }
 
     func closeLoadout() {
         screen = .menu
+    }
+
+    func openSettings() {
+        screen = .settings
+    }
+
+    func closeSettings() {
+        // Apply any server-host change to the next connection.
+        profileService.serverHost = Settings.serverHost
+        profileService.reset()
+        screen = .menu
+    }
+
+    func refreshProfile() {
+        profileService.serverHost = Settings.serverHost
+        Task { await profileService.refresh() }
     }
 
     func rematch() {

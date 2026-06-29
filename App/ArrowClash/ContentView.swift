@@ -9,9 +9,11 @@ struct ContentView: View {
     var body: some View {
         switch model.screen {
         case .menu, .searching:
-            MenuView(model: model)
+            MenuView(model: model, profileService: model.profileService)
         case .loadout:
             LoadoutView(profileService: model.profileService, onClose: { model.closeLoadout() })
+        case .settings:
+            SettingsView(onClose: { model.closeSettings() })
         case .playing:
             if let scene = model.scene {
                 GameView(scene: scene, model: model)

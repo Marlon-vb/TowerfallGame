@@ -34,6 +34,11 @@ final class ProfileService: ObservableObject {
         "\(useSSL ? "https" : "http")://\(serverHost):\(httpPort)"
     }
 
+    // Drop the cached session (e.g. after the server host changes).
+    func reset() {
+        token = nil
+    }
+
     // MARK: Public API
 
     func refresh() async {

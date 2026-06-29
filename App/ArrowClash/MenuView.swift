@@ -1,26 +1,30 @@
 // MenuView.swift
-// Minimal start menu: local practice or find an online 1v1. Polished menus,
-// loadout and post-match screens come in later phases.
+// Start menu: shows level/XP, and routes to online match, local practice,
+// loadout, or settings.
 
 import SwiftUI
 
 struct MenuView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var profileService: ProfileService
 
     var body: some View {
         ZStack {
             Color(red: 0.06, green: 0.07, blue: 0.10).ignoresSafeArea()
-            VStack(spacing: 24) {
+            VStack(spacing: 22) {
                 Text("ArrowClash")
                     .font(.system(size: 44, weight: .heavy))
                     .foregroundColor(.white)
 
-                if model.screen == .searching {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .tint(.white)
-                    Text(model.statusText)
+                if let profile = profileService.profile {
+                    Text("Level \(profile.level)   -   \(profile.xp) XP")
+                        .font(.subheadline)
                         .foregroundColor(.white.opacity(0.8))
+                }
+
+                if model.screen == .searching {
+                    ProgressView().progressViewStyle(.circular).tint(.white)
+                    Text(model.statusText).foregroundColor(.white.opacity(0.8))
                     Button("Cancel") { model.leave() }
                         .buttonStyle(MenuButtonStyle(prominent: false))
                 } else {
@@ -30,19 +34,20 @@ struct MenuView: View {
                         .buttonStyle(MenuButtonStyle(prominent: false))
                     Button("Loadout") { model.openLoadout() }
                         .buttonStyle(MenuButtonStyle(prominent: false))
+                    Button("Settings") { model.openSettings() }
+                        .buttonStyle(MenuButtonStyle(prominent: false))
                     if !model.statusText.isEmpty {
-                        Text(model.statusText)
-                            .font(.footnote)
-                            .foregroundColor(.orange)
+                        Text(model.statusText).font(.footnote).foregroundColor(.orange)
                     }
                 }
             }
             .padding(40)
         }
+        .onAppear { model.refreshProfile() }
     }
 }
 
-private struct MenuButtonStyle: ButtonStyle {
+struct MenuButtonStyle: ButtonStyle {
     let prominent: Bool
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
