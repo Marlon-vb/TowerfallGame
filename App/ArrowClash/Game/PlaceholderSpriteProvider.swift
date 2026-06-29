@@ -15,6 +15,8 @@ final class PlaceholderSpriteProvider: SpriteProvider {
     private let canvas = CGSize(width: 24, height: 34)
     private var cache: [String: SKTexture] = [:]
 
+    var nativeFrameSize: CGSize { canvas }
+
     // MARK: SpriteProvider
 
     func frameCount(state: AnimState) -> Int {

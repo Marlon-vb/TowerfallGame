@@ -21,8 +21,12 @@ final class AnimatedAvatarNode: SKNode {
     init(avatar: Avatar, provider: SpriteProvider, width: CGFloat, height: CGFloat, isLocal: Bool) {
         self.avatar = avatar
         self.provider = provider
-        // Draw slightly larger than the hitbox so the character reads well.
-        self.displaySize = CGSize(width: width * 1.5, height: height * 1.5)
+        // Scale the source frame so the character reads a bit larger than the
+        // hitbox, preserving the source aspect ratio.
+        let native = provider.nativeFrameSize
+        let targetHeight = height * 2.2
+        let scale = native.height > 0 ? targetHeight / native.height : 1
+        self.displaySize = CGSize(width: native.width * scale, height: native.height * scale)
         super.init()
 
         for layer in AvatarLayer.allCases {
@@ -55,11 +59,12 @@ final class AnimatedAvatarNode: SKNode {
         baseState = state
     }
 
-    func playOneShot(_ state: AnimState, duration: CGFloat) {
+    func playOneShot(_ state: AnimState) {
         currentState = state
         frameIndex = 0
         frameTimer = 0
-        oneShotRemaining = duration
+        let count = CGFloat(provider.frameCount(state: state))
+        oneShotRemaining = count / max(1, provider.fps(state: state))
         applyFrame()
     }
 

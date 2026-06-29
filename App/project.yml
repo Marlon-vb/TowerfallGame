@@ -33,6 +33,13 @@ targets:
     platform: iOS
     sources:
       - path: ArrowClash
+        excludes:
+          - "Sprites/**"
+      # Folder reference: preserves the Sprites/ subfolder structure in the
+      # bundle so per-frame PNGs with repeating names (east_0.png in each
+      # animation folder) don't collide.
+      - path: ArrowClash/Sprites
+        type: folder
     dependencies:
       - package: ArrowClashSim
         product: ArrowClashSim

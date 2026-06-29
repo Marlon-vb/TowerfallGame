@@ -39,6 +39,8 @@ enum AvatarLayer: Int, CaseIterable {
 }
 
 protocol SpriteProvider {
+    // The provider's source frame size (used to scale layers consistently).
+    var nativeFrameSize: CGSize { get }
     func frameCount(state: AnimState) -> Int
     func fps(state: AnimState) -> CGFloat
     func isLooping(state: AnimState) -> Bool

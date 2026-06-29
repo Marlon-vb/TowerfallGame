@@ -6,6 +6,17 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 
 ## [Unreleased]
 
+### Real base-body sprites in-game (2026-06-29)
+- `FileSpriteProvider` loads the PixelLab-generated base body (per-frame PNGs in
+  Sprites/skin/<state>, 68x68, east-only mirrored for left, full color) matching
+  Sprites/skin/NOTES.md; skips PixelLab reference frames on fall/dash.
+- `SpriteProvider` gains `nativeFrameSize`; `AnimatedAvatarNode` scales layers
+  from it and auto-times one-shots; GameScene uses the file provider.
+- project.yml: Sprites/ is a folder reference so per-frame PNGs with repeating
+  names bundle without collisions.
+- Hair/shirt/pants/accessory layers hidden until their art exists (skin art is
+  full-color, non-tintable for now).
+
 ### UI layout & scrolling fixes (Phase 8.1) (2026-06-29)
 - Added `ScreenScaffold`: centers content when it fits and scrolls when it does
   not, respects safe areas, caps content width. Fixes menus clipping in

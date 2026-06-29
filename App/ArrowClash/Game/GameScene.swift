@@ -25,7 +25,7 @@ final class GameScene: SKScene {
     private let world = SKNode() // everything that can shake
     private var playerNodes: [AnimatedAvatarNode] = []
     private var arrowNodes: [SKShapeNode] = []
-    private let spriteProvider: SpriteProvider = PlaceholderSpriteProvider.shared
+    private let spriteProvider: SpriteProvider = FileSpriteProvider.shared
     private static let runThreshold: Int32 = 20000 // ~0.3 px/tick in Q16.16
     private var hud = SKLabelNode()
     private var scoreLabel = SKLabelNode()
@@ -236,7 +236,7 @@ final class GameScene: SKScene {
                 let owner = Int(current.arrows[i].owner)
                 if owner == me { AudioManager.shared.play("shoot", on: self) }
                 if owner >= 0 && owner < playerNodes.count {
-                    playerNodes[owner].playOneShot(.shoot, duration: 0.14)
+                    playerNodes[owner].playOneShot(.shoot)
                 }
             }
         }
