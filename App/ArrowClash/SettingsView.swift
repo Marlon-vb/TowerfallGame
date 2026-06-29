@@ -13,7 +13,8 @@ struct SettingsView: View {
     var body: some View {
         ZStack {
             Color(red: 0.06, green: 0.07, blue: 0.10).ignoresSafeArea()
-            VStack(spacing: 22) {
+            ScreenScaffold {
+              VStack(spacing: 22) {
                 Text("Settings")
                     .font(.system(size: 30, weight: .heavy))
                     .foregroundColor(.white)
@@ -35,14 +36,14 @@ struct SettingsView: View {
                 }
                 .frame(width: 280)
 
-                Spacer()
                 Button("Back") { onClose() }
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                     .frame(width: 200, height: 46)
                     .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.15)))
+                    .padding(.top, 8)
+              }
             }
-            .padding(28)
         }
     }
 }

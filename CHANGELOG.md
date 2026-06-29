@@ -6,6 +6,13 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 
 ## [Unreleased]
 
+### UI layout & scrolling fixes (Phase 8.1) (2026-06-29)
+- Added `ScreenScaffold`: centers content when it fits and scrolls when it does
+  not, respects safe areas, caps content width. Fixes menus clipping in
+  landscape on smaller iPhones.
+- Applied to Menu, Settings, Customize, and Store; removed nested vertical
+  scrolls (kept per-row horizontal scroll in Customize).
+
 ### Layered sprite pipeline - animated characters (2026-06-29)
 - Characters now animate via a layered, tintable sprite system (steps 1-5 of
   docs/SPRITE_PIPELINE.md). Render-only; sim/netcode untouched.

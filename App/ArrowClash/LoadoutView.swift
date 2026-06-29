@@ -16,7 +16,8 @@ struct CustomizeView: View {
     var body: some View {
         ZStack {
             Color(red: 0.06, green: 0.07, blue: 0.10).ignoresSafeArea()
-            VStack(spacing: 12) {
+            ScreenScaffold {
+              VStack(spacing: 12) {
                 HStack {
                     Text("Customize").font(.system(size: 26, weight: .heavy)).foregroundColor(.white)
                     Spacer()
@@ -26,12 +27,8 @@ struct CustomizeView: View {
                 AvatarPreview(avatar: profile.avatar)
                     .frame(width: 70, height: 100)
 
-                ScrollView {
-                    VStack(spacing: 14) {
-                        ForEach(Catalog.customizeSlots, id: \.self) { slot in
-                            slotSection(slot)
-                        }
-                    }
+                ForEach(Catalog.customizeSlots, id: \.self) { slot in
+                    slotSection(slot)
                 }
 
                 HStack(spacing: 14) {
@@ -40,8 +37,9 @@ struct CustomizeView: View {
                     Button("Back") { onClose() }
                         .buttonStyle(SmallButtonStyle(prominent: false))
                 }
+                .padding(.top, 6)
+              }
             }
-            .padding(20)
         }
         .task { await profileService.refresh() }
     }

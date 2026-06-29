@@ -14,7 +14,8 @@ struct MenuView: View {
                                     Color(red: 0.04, green: 0.04, blue: 0.07)],
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
-            VStack(spacing: 22) {
+            ScreenScaffold {
+              VStack(spacing: 22) {
                 Text("ArrowClash")
                     .font(.system(size: 46, weight: .heavy))
                     .foregroundColor(.white)
@@ -47,8 +48,8 @@ struct MenuView: View {
                         Text(model.statusText).font(.footnote).foregroundColor(.orange)
                     }
                 }
+              }
             }
-            .padding(40)
         }
         .onAppear { model.refreshProfile() }
     }
