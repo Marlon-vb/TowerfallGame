@@ -21,6 +21,11 @@ options:
 packages:
   ArrowClashSim:
     path: ../ArrowClashSim
+  # Nakama Swift client SDK. If version resolution fails, adjust the version to
+  # one that exists for your toolchain (or pin a branch/revision).
+  Nakama:
+    url: https://github.com/heroiclabs/nakama-swift
+    from: "2.0.0"
 
 targets:
   ArrowClash:
@@ -30,6 +35,11 @@ targets:
       - path: ArrowClash
     dependencies:
       - package: ArrowClashSim
+        product: ArrowClashSim
+      - package: ArrowClashSim
+        product: ArrowClashNet
+      - package: Nakama
+        product: Nakama
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: net.montyinc.arrowclash

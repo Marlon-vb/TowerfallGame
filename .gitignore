@@ -17,3 +17,7 @@ Package.resolved
 
 # XcodeGen generates ArrowClash.xcodeproj from App/project.yml
 App/ArrowClash.xcodeproj/
+
+# Go plugin build artifacts
+*.so
+nakama/vendor/

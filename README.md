@@ -6,15 +6,14 @@ rollback netcode.
 
 This repository is being built in phases. See `docs/` for the per-phase notes.
 
-## Current status: Phase 2 (rollback netcode, offline)
+## Current status: Phase 3 (Nakama online 1v1)
 
-`ArrowClashNet` adds GGPO-style rollback (behind swappable `NetcodeSession` and
-`InputTransport` protocols) on top of the deterministic sim. Two sim instances
-stay in sync under simulated latency, jitter and packet loss, proven headlessly
-against a full-information reference replay. See `docs/PHASE2.md`.
+Local Nakama (docker-compose + Go relay module) provides device auth,
+matchmaking, and a relayed match that carries per-tick inputs into the rollback
+system. Two clients match and play a synced 1v1. See `docs/PHASE3.md`.
 
-Earlier: Phase 0 (deterministic sim), Phase 1 (arrows + SpriteKit local play
-harness). See `docs/`.
+Earlier: Phase 0 (deterministic sim), Phase 1 (arrows + SpriteKit local play),
+Phase 2 (rollback netcode, offline-proven). See `docs/`.
 
 ## Layout
 
@@ -24,9 +23,10 @@ ArrowClashSim/                 Swift package: sim + netcode
   Sources/ArrowClashNet/       Rollback netcode (sim-dependent, no UIKit/SpriteKit)
   Tests/ArrowClashSimTests/    Determinism + movement + combat tests
   Tests/ArrowClashNetTests/    Rollback correctness + fuzz tests
-App/                           iOS app target (SwiftUI shell for now)
+App/                           iOS app target (SpriteKit + SwiftUI)
   project.yml                  XcodeGen spec -> generates ArrowClash.xcodeproj
-  ArrowClash/                  App sources
+  ArrowClash/                  App sources (Game/, Online/, menu, app model)
+nakama/                        Local backend: docker-compose + Go runtime module
 docs/                          Phase notes and design decisions
 ```
 

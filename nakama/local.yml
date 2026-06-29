@@ -1,0 +1,15 @@
+# Minimal Nakama config for local ArrowClash development.
+# The default server key "defaultkey" is used; the Swift client must match it.
+name: arrowclash
+logger:
+  level: "INFO"
+session:
+  token_expiry_sec: 7200
+socket:
+  # Per-tick input packets are tiny; keep the limits modest.
+  max_message_size_bytes: 4096
+  max_request_size_bytes: 131072
+matchmaker:
+  # 1v1: a ticket needs exactly one other ticket to match.
+  interval_sec: 5
+  max_intervals: 60

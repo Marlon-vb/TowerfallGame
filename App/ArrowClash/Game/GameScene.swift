@@ -1,8 +1,8 @@
 // GameScene.swift
 // Renders the deterministic sim. SpriteKit ONLY draws state the sim produces;
-// it never moves anything itself (no SKPhysics, no SKAction movement). The sim
-// runs on a fixed 60 Hz timestep accumulated from frame time, and rendering
-// interpolates between the previous and current sim state for smoothness.
+// it never moves anything itself (no SKPhysics, no SKAction movement). A
+// SceneDriver advances the game one fixed 60 Hz tick at a time; rendering
+// interpolates between the previous and current state for smoothness.
 //
 // Coordinate mapping: the sim is y-down with origin at the top-left; the scene
 // is y-up with origin at the bottom-left. So skY = worldHeight - simY. The only
@@ -15,9 +15,7 @@ final class GameScene: SKScene {
     private let config = GameConfig.default
     private let map = TileMap.defaultArena()
     private let input: InputBus
-
-    private var current: GameState
-    private var previous: GameState
+    private let driver: SceneDriver
 
     private let tickDuration: TimeInterval = 1.0 / 60.0
     private var accumulator: TimeInterval = 0
@@ -25,7 +23,7 @@ final class GameScene: SKScene {
 
     private var playerNodes: [SKShapeNode] = []
     private var arrowNodes: [SKShapeNode] = []
-    private var hud: SKLabelNode = SKLabelNode()
+    private var hud = SKLabelNode()
 
     private var worldWidthPx: Float { Float(map.cols * config.tileSize) }
     private var worldHeightPx: Float { Float(map.rows * config.tileSize) }
@@ -35,11 +33,9 @@ final class GameScene: SKScene {
         SKColor(red: 1.00, green: 0.45, blue: 0.40, alpha: 1.0),
     ]
 
-    init(input: InputBus) {
+    init(input: InputBus, driver: SceneDriver) {
         self.input = input
-        let initial = GameState.initial(config: GameConfig.default, seed: 1)
-        self.current = initial
-        self.previous = initial
+        self.driver = driver
         let worldSize = CGSize(
             width: GameConfig.default.tileSize * TileMap.defaultArena().cols,
             height: GameConfig.default.tileSize * TileMap.defaultArena().rows
@@ -63,8 +59,7 @@ final class GameScene: SKScene {
     private func buildTiles() {
         let ts = CGFloat(config.tileSize)
         for row in 0..<map.rows {
-            for col in 0..<map.cols {
-                guard map.isSolid(col: col, row: row) else { continue }
+            for col in 0..<map.cols where map.isSolid(col: col, row: row) {
                 let tile = SKSpriteNode(color: SKColor(red: 0.22, green: 0.24, blue: 0.30, alpha: 1.0),
                                         size: CGSize(width: ts, height: ts))
                 let simCx = Float(col * config.tileSize) + Float(config.tileSize) / 2
@@ -76,17 +71,18 @@ final class GameScene: SKScene {
     }
 
     private func buildEntities() {
+        let state = driver.renderStates().current
         let w = CGFloat(config.playerWidth.toFloat)
         let h = CGFloat(config.playerHeight.toFloat)
-        for i in 0..<current.players.count {
+        for i in 0..<state.players.count {
             let node = SKShapeNode(rectOf: CGSize(width: w, height: h), cornerRadius: 2)
             node.fillColor = playerColors[i % playerColors.count]
-            node.strokeColor = .white
+            node.strokeColor = (i == driver.localPlayer) ? .white : .clear
             node.lineWidth = 1
             addChild(node)
             playerNodes.append(node)
         }
-        for _ in 0..<current.arrows.count {
+        for _ in 0..<state.arrows.count {
             let node = SKShapeNode(rectOf: CGSize(width: 7, height: 2))
             node.fillColor = SKColor(red: 0.95, green: 0.9, blue: 0.5, alpha: 1.0)
             node.strokeColor = .clear
@@ -112,28 +108,25 @@ final class GameScene: SKScene {
         if lastTime == 0 { lastTime = currentTime }
         var frameDelta = currentTime - lastTime
         lastTime = currentTime
-        if frameDelta > 0.25 { frameDelta = 0.25 } // avoid spiral after a stall
+        if frameDelta > 0.25 { frameDelta = 0.25 }
 
         accumulator += frameDelta
         while accumulator >= tickDuration {
-            previous = current
-            let command = input.consumeForTick()
-            // Single player for Phase 1: player 1 is an idle dummy.
-            Simulation.tick(state: &current, inputs: [command, .neutral], map: map, config: config)
+            driver.advance(localInput: input.consumeForTick())
             accumulator -= tickDuration
         }
 
-        let alpha = Float(accumulator / tickDuration)
-        renderInterpolated(alpha: alpha)
+        renderInterpolated(alpha: Float(accumulator / tickDuration))
     }
 
     // MARK: - Render
 
     private func renderInterpolated(alpha: Float) {
+        let (previous, current) = driver.renderStates()
         let halfW = config.playerWidth.toFloat / 2
         let halfH = config.playerHeight.toFloat / 2
 
-        for i in 0..<playerNodes.count {
+        for i in 0..<playerNodes.count where i < current.players.count {
             let pPrev = previous.players[i]
             let pCur = current.players[i]
             let cx = interp(pPrev.pos.x.toFloat + halfW, pCur.pos.x.toFloat + halfW, alpha, worldWidthPx)
@@ -141,7 +134,7 @@ final class GameScene: SKScene {
             playerNodes[i].position = skPoint(cx, cy)
         }
 
-        for a in 0..<arrowNodes.count {
+        for a in 0..<arrowNodes.count where a < current.arrows.count {
             let cur = current.arrows[a]
             let node = arrowNodes[a]
             if !cur.active {
@@ -163,23 +156,22 @@ final class GameScene: SKScene {
             node.zRotation = arrowRotation(cur)
         }
 
-        hud.text = "Arrows: \(current.players[0].arrows)/\(config.startingArrows)"
+        let me = driver.localPlayer
+        if me < current.players.count {
+            hud.text = "Arrows: \(current.players[me].arrows)/\(config.startingArrows)"
+        }
     }
 
-    // sim point (y-down) -> scene point (y-up)
     private func skPoint(_ simX: Float, _ simY: Float) -> CGPoint {
         return CGPoint(x: CGFloat(simX), y: CGFloat(worldHeightPx - simY))
     }
 
-    // Linear interpolation that snaps instead of interpolating across a wrap seam.
     private func interp(_ from: Float, _ to: Float, _ t: Float, _ wrap: Float) -> Float {
         let delta = to - from
         if abs(delta) > wrap * 0.5 { return to }
         return from + delta * t
     }
 
-    // Orientation for an arrow. Flying arrows point along velocity; stuck arrows
-    // keep the fired direction. Negate Y because the scene is y-up.
     private func arrowRotation(_ arrow: ArrowState) -> CGFloat {
         if !arrow.stuck && (arrow.vel.x.raw != 0 || arrow.vel.y.raw != 0) {
             return CGFloat(atan2(Double(-arrow.vel.y.toFloat), Double(arrow.vel.x.toFloat)))
