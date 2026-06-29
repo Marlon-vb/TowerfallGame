@@ -1,81 +1,125 @@
 // catalog.go
-// Static cosmetic catalog and the XP/level curve. Cosmetics are gated by level;
-// "owned" means the player's level has reached the cosmetic's required level.
-// This is the server's source of truth; the client mirrors it for display.
+// Avatar item catalog and the XP/coin curves. An avatar is a set of equipped
+// item ids, one per slot. Items with Cost == 0 are free base options (always
+// owned); items with Cost > 0 are store items the player buys with coins.
+// This is the server's source of truth; the client mirrors ids + costs.
 
 package main
 
 const roundsToWin = 3 // mirrors GameConfig.roundsToWin (best of 5)
 const mapCount = 10   // mirrors the client's Maps catalog count
 
-type Cosmetic struct {
-	ID            string
-	Kind          string // "skin" or "trail"
-	RequiredLevel int
+type Item struct {
+	ID   string
+	Slot string // "skin", "hair", "shirt", "pants", "head", "trail"
+	Cost int    // 0 == free base option
 }
 
-// Order here is the display order; ids must be unique across kinds.
-var catalog = []Cosmetic{
-	// 9 characters (cosmetic skins) gated by level.
-	{ID: "skin_blue", Kind: "skin", RequiredLevel: 1},
-	{ID: "skin_red", Kind: "skin", RequiredLevel: 1},
-	{ID: "skin_green", Kind: "skin", RequiredLevel: 2},
-	{ID: "skin_purple", Kind: "skin", RequiredLevel: 3},
-	{ID: "skin_orange", Kind: "skin", RequiredLevel: 4},
-	{ID: "skin_gold", Kind: "skin", RequiredLevel: 5},
-	{ID: "skin_cyan", Kind: "skin", RequiredLevel: 6},
-	{ID: "skin_pink", Kind: "skin", RequiredLevel: 8},
-	{ID: "skin_shadow", Kind: "skin", RequiredLevel: 10},
-	{ID: "trail_white", Kind: "trail", RequiredLevel: 1},
-	{ID: "trail_fire", Kind: "trail", RequiredLevel: 3},
-	{ID: "trail_ice", Kind: "trail", RequiredLevel: 4},
+// Free base options + paid store items. Ids must be unique across slots.
+var items = []Item{
+	// Skin tones (free).
+	{ID: "skin_1", Slot: "skin", Cost: 0},
+	{ID: "skin_2", Slot: "skin", Cost: 0},
+	{ID: "skin_3", Slot: "skin", Cost: 0},
+	{ID: "skin_4", Slot: "skin", Cost: 0},
+	{ID: "skin_5", Slot: "skin", Cost: 0},
+	// Hair colors (free base) + premium.
+	{ID: "hair_black", Slot: "hair", Cost: 0},
+	{ID: "hair_brown", Slot: "hair", Cost: 0},
+	{ID: "hair_blonde", Slot: "hair", Cost: 0},
+	{ID: "hair_red", Slot: "hair", Cost: 0},
+	{ID: "hair_gray", Slot: "hair", Cost: 0},
+	{ID: "hair_white", Slot: "hair", Cost: 0},
+	{ID: "hair_blue", Slot: "hair", Cost: 120},
+	{ID: "hair_pink", Slot: "hair", Cost: 120},
+	// Shirts (free base) + premium.
+	{ID: "shirt_gray", Slot: "shirt", Cost: 0},
+	{ID: "shirt_green", Slot: "shirt", Cost: 0},
+	{ID: "shirt_blue", Slot: "shirt", Cost: 0},
+	{ID: "shirt_red", Slot: "shirt", Cost: 0},
+	{ID: "shirt_gold", Slot: "shirt", Cost: 150},
+	// Pants (free base) + premium.
+	{ID: "pants_navy", Slot: "pants", Cost: 0},
+	{ID: "pants_brown", Slot: "pants", Cost: 0},
+	{ID: "pants_black", Slot: "pants", Cost: 0},
+	{ID: "pants_teal", Slot: "pants", Cost: 0},
+	// Head accessories: none is free, the rest are store items.
+	{ID: "head_none", Slot: "head", Cost: 0},
+	{ID: "head_cap", Slot: "head", Cost: 100},
+	{ID: "head_helmet", Slot: "head", Cost: 200},
+	{ID: "head_horns", Slot: "head", Cost: 250},
+	{ID: "head_halo", Slot: "head", Cost: 350},
+	{ID: "head_crown", Slot: "head", Cost: 500},
+	// Arrow trails: white free, others store items.
+	{ID: "trail_white", Slot: "trail", Cost: 0},
+	{ID: "trail_fire", Slot: "trail", Cost: 200},
+	{ID: "trail_ice", Slot: "trail", Cost: 200},
 }
 
-func requiredLevel(id string) int {
-	for _, c := range catalog {
-		if c.ID == id {
-			return c.RequiredLevel
+func itemByID(id string) (Item, bool) {
+	for _, it := range items {
+		if it.ID == id {
+			return it, true
 		}
 	}
-	return -1 // unknown id
+	return Item{}, false
 }
 
-func cosmeticKind(id string) string {
-	for _, c := range catalog {
-		if c.ID == id {
-			return c.Kind
-		}
-	}
-	return ""
-}
-
-// A cosmetic is owned when the player's level meets its required level.
-func isOwned(id string, level int) bool {
-	rl := requiredLevel(id)
-	return rl >= 1 && level >= rl
-}
-
-type Loadout struct {
+type Avatar struct {
 	Skin  string `json:"skin"`
+	Hair  string `json:"hair"`
+	Shirt string `json:"shirt"`
+	Pants string `json:"pants"`
+	Head  string `json:"head"`
 	Trail string `json:"trail"`
 }
 
-func defaultLoadout() Loadout {
-	return Loadout{Skin: "skin_blue", Trail: "trail_white"}
+func defaultAvatar() Avatar {
+	return Avatar{
+		Skin:  "skin_2",
+		Hair:  "hair_brown",
+		Shirt: "shirt_gray",
+		Pants: "pants_navy",
+		Head:  "head_none",
+		Trail: "trail_white",
+	}
 }
 
 type Profile struct {
-	XP      int     `json:"xp"`
-	Level   int     `json:"level"`
-	Loadout Loadout `json:"loadout"`
+	XP     int      `json:"xp"`
+	Level  int      `json:"level"`
+	Coins  int      `json:"coins"`
+	Owned  []string `json:"owned"` // purchased item ids (free items are implicitly owned)
+	Avatar Avatar   `json:"avatar"`
 }
 
 func defaultProfile() Profile {
-	return Profile{XP: 0, Level: 1, Loadout: defaultLoadout()}
+	return Profile{XP: 0, Level: 1, Coins: 0, Owned: []string{}, Avatar: defaultAvatar()}
+}
+
+func ownsItem(profile Profile, id string) bool {
+	it, ok := itemByID(id)
+	if !ok {
+		return false
+	}
+	if it.Cost == 0 {
+		return true // free base option
+	}
+	for _, owned := range profile.Owned {
+		if owned == id {
+			return true
+		}
+	}
+	return false
+}
+
+// Validates that an equipped item exists and matches the slot.
+func itemInSlot(id, slot string) bool {
+	it, ok := itemByID(id)
+	return ok && it.Slot == slot
 }
 
 // Cumulative XP required to reach a level: 50*(L-1)*L.
-// L2=100, L3=300, L4=600, L5=1000, ...
 func xpToReach(level int) int {
 	if level <= 1 {
 		return 0
@@ -91,8 +135,6 @@ func levelForXP(xp int) int {
 	return level
 }
 
-// XP earned for a match result. Server-computed; client-reported result is only
-// used for these clamped inputs, never trusted for the XP value itself.
 func xpForMatch(won bool, kills int) int {
 	if kills < 0 {
 		kills = 0
@@ -103,6 +145,20 @@ func xpForMatch(won bool, kills int) int {
 	gain := 50 + kills*25
 	if won {
 		gain += 75
+	}
+	return gain
+}
+
+func coinsForMatch(won bool, kills int) int {
+	if kills < 0 {
+		kills = 0
+	}
+	if kills > roundsToWin {
+		kills = roundsToWin
+	}
+	gain := 10 + kills*5
+	if won {
+		gain += 20
 	}
 	return gain
 }

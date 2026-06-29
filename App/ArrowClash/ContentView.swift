@@ -10,8 +10,12 @@ struct ContentView: View {
         switch model.screen {
         case .menu, .searching:
             MenuView(model: model, profileService: model.profileService)
-        case .loadout:
-            LoadoutView(profileService: model.profileService, onClose: { model.closeLoadout() })
+        case .customize:
+            CustomizeView(profileService: model.profileService,
+                          onClose: { model.backToMenu() },
+                          onStore: { model.openStore() })
+        case .store:
+            StoreView(profileService: model.profileService, onClose: { model.openCustomize() })
         case .settings:
             SettingsView(onClose: { model.closeSettings() })
         case .playing:

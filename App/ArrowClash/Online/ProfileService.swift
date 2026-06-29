@@ -61,10 +61,24 @@ final class ProfileService: ObservableObject {
     }
 
     @discardableResult
-    func setLoadout(skin: String, trail: String) async -> Bool {
+    func setAvatar(_ avatar: Avatar) async -> Bool {
         do {
-            let inner = try jsonString(CosmeticLoadout(skin: skin, trail: trail))
-            profile = try await rpcProfile("set_loadout", innerPayload: inner)
+            let inner = try jsonString(avatar)
+            profile = try await rpcProfile("set_avatar", innerPayload: inner)
+            return true
+        } catch {
+            statusText = "\(error)"
+            return false
+        }
+    }
+
+    private struct PurchaseRequest: Encodable { let itemId: String }
+
+    @discardableResult
+    func purchase(_ itemId: String) async -> Bool {
+        do {
+            let inner = try jsonString(PurchaseRequest(itemId: itemId))
+            profile = try await rpcProfile("purchase", innerPayload: inner)
             return true
         } catch {
             statusText = "\(error)"

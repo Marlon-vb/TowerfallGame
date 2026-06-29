@@ -45,7 +45,10 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	if err := initializer.RegisterRpc("get_profile", rpcGetProfile); err != nil {
 		return err
 	}
-	if err := initializer.RegisterRpc("set_loadout", rpcSetLoadout); err != nil {
+	if err := initializer.RegisterRpc("set_avatar", rpcSetAvatar); err != nil {
+		return err
+	}
+	if err := initializer.RegisterRpc("purchase", rpcPurchase); err != nil {
 		return err
 	}
 

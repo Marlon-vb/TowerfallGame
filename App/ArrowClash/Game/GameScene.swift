@@ -23,7 +23,7 @@ final class GameScene: SKScene {
     private var lastTime: TimeInterval = 0
 
     private let world = SKNode() // everything that can shake
-    private var playerNodes: [SKShapeNode] = []
+    private var playerNodes: [SKNode] = []
     private var arrowNodes: [SKShapeNode] = []
     private var hud = SKLabelNode()
     private var scoreLabel = SKLabelNode()
@@ -34,32 +34,25 @@ final class GameScene: SKScene {
     var onMatchEnd: ((Bool, Int, Int) -> Void)?
     private var matchEndFired = false
 
-    // Cosmetic colors per player slot (skin = body, trail = arrow color).
-    private let skinColors: [SKColor]
-    private let trailColors: [SKColor]
+    // Per-player avatar (layered look) and resolved arrow-trail colors.
+    private let avatars: [Avatar]
+    private var trailColors: [SKColor]
 
     private var worldWidthPx: Float { Float(map.cols * config.tileSize) }
     private var worldHeightPx: Float { Float(map.rows * config.tileSize) }
 
-    private let playerColors: [SKColor] = [
-        SKColor(red: 0.30, green: 0.75, blue: 1.00, alpha: 1.0),
-        SKColor(red: 1.00, green: 0.45, blue: 0.40, alpha: 1.0),
-    ]
-
     init(input: InputBus,
          driver: SceneDriver,
          map: MapDefinition = Maps.default,
-         skinColors: [SKColor] = [SKColor(red: 0.30, green: 0.75, blue: 1.00, alpha: 1.0),
-                                  SKColor(red: 1.00, green: 0.45, blue: 0.40, alpha: 1.0)],
-         trailColors: [SKColor] = [.white, .white],
+         avatars: [Avatar] = [.default, .default],
          tileColor: SKColor = SKColor(red: 0.22, green: 0.24, blue: 0.30, alpha: 1.0),
          bgColor: SKColor = SKColor(red: 0.08, green: 0.09, blue: 0.12, alpha: 1.0)) {
         self.input = input
         self.driver = driver
         self.map = map.tileMap()
         self.tileColor = tileColor
-        self.skinColors = skinColors
-        self.trailColors = trailColors
+        self.avatars = avatars
+        self.trailColors = avatars.map { Catalog.color($0.trail) }
         let worldSize = CGSize(
             width: GameConfig.default.tileSize * map.cols,
             height: GameConfig.default.tileSize * map.rows
@@ -101,10 +94,8 @@ final class GameScene: SKScene {
         let w = CGFloat(config.playerWidth.toFloat)
         let h = CGFloat(config.playerHeight.toFloat)
         for i in 0..<state.players.count {
-            let node = SKShapeNode(rectOf: CGSize(width: w, height: h), cornerRadius: 2)
-            node.fillColor = i < skinColors.count ? skinColors[i] : playerColors[i % playerColors.count]
-            node.strokeColor = (i == driver.localPlayer) ? .white : .clear
-            node.lineWidth = 1
+            let avatar = i < avatars.count ? avatars[i] : .default
+            let node = AvatarRenderer.build(avatar: avatar, width: w, height: h, isLocal: i == driver.localPlayer)
             world.addChild(node)
             playerNodes.append(node)
         }

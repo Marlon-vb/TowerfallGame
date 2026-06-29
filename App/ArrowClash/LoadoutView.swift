@@ -1,75 +1,138 @@
 // LoadoutView.swift
-// Shows the player's level/XP and the cosmetic catalog. Unlocked cosmetics
-// (level >= required) can be equipped; the equip call is validated and persisted
+// Character customizer: equip owned items per slot (skin/hair/shirt/pants/head/
+// trail). Owned = free base items plus anything purchased. Locked items show
+// their cost and route to the Store. Equip changes are validated/persisted
 // server-side via ProfileService.
 
 import SwiftUI
 
-struct LoadoutView: View {
+struct CustomizeView: View {
     @ObservedObject var profileService: ProfileService
     var onClose: () -> Void
+    var onStore: () -> Void
 
     private var profile: PlayerProfile { profileService.profile ?? .placeholder }
 
     var body: some View {
         ZStack {
             Color(red: 0.06, green: 0.07, blue: 0.10).ignoresSafeArea()
-            VStack(spacing: 18) {
-                header
-                section(title: "Skin", items: Cosmetics.skins, current: profile.loadout.skin) { id in
-                    Task { await profileService.setLoadout(skin: id, trail: profile.loadout.trail) }
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Customize").font(.system(size: 26, weight: .heavy)).foregroundColor(.white)
+                    Spacer()
+                    Text("\(profile.coins) coins").font(.subheadline).foregroundColor(.yellow)
                 }
-                section(title: "Arrow Trail", items: Cosmetics.trails, current: profile.loadout.trail) { id in
-                    Task { await profileService.setLoadout(skin: profile.loadout.skin, trail: id) }
+
+                AvatarPreview(avatar: profile.avatar)
+                    .frame(width: 70, height: 100)
+
+                ScrollView {
+                    VStack(spacing: 14) {
+                        ForEach(Catalog.customizeSlots, id: \.self) { slot in
+                            slotSection(slot)
+                        }
+                    }
                 }
-                if !profileService.statusText.isEmpty {
-                    Text(profileService.statusText).font(.caption).foregroundColor(.orange)
+
+                HStack(spacing: 14) {
+                    Button("Store") { onStore() }
+                        .buttonStyle(SmallButtonStyle(prominent: true))
+                    Button("Back") { onClose() }
+                        .buttonStyle(SmallButtonStyle(prominent: false))
                 }
-                Spacer()
-                Button("Back") { onClose() }
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 200, height: 46)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.15)))
             }
-            .padding(28)
+            .padding(20)
         }
         .task { await profileService.refresh() }
     }
 
-    private var header: some View {
-        VStack(spacing: 4) {
-            Text("Loadout").font(.system(size: 30, weight: .heavy)).foregroundColor(.white)
-            Text("Level \(profile.level)   -   \(profile.xp) XP")
-                .font(.subheadline).foregroundColor(.white.opacity(0.8))
-            Text("Next level at \(Cosmetics.xpToReach(level: profile.level + 1)) XP")
-                .font(.caption2).foregroundColor(.white.opacity(0.5))
-        }
-    }
-
-    private func section(title: String, items: [CosmeticItem], current: String, onPick: @escaping (String) -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline).foregroundColor(.white)
-            HStack(spacing: 12) {
-                ForEach(items) { item in
-                    let owned = profile.level >= item.requiredLevel
-                    let selected = item.id == current
-                    Button { if owned { onPick(item.id) } } label: {
-                        VStack(spacing: 4) {
-                            Circle()
-                                .fill(Color(uiColor: item.color))
-                                .frame(width: 40, height: 40)
-                                .overlay(Circle().stroke(selected ? Color.white : Color.clear, lineWidth: 3))
-                                .opacity(owned ? 1.0 : 0.3)
-                            Text(owned ? (selected ? "Equipped" : "Equip") : "Lvl \(item.requiredLevel)")
-                                .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(owned ? 0.9 : 0.5))
-                        }
+    private func slotSection(_ slot: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(CosmeticNaming.slotTitle(slot)).font(.headline).foregroundColor(.white)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Catalog.items(slot: slot)) { item in
+                        swatch(item, slot: slot)
                     }
-                    .disabled(!owned)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func swatch(_ item: StoreItem, slot: String) -> some View {
+        let owned = Catalog.isOwned(item.id, profile: profile)
+        let selected = Catalog.equipped(profile.avatar, slot: slot) == item.id
+        return Button {
+            if owned {
+                Task { await profileService.setAvatar(Catalog.equipping(profile.avatar, slot: slot, id: item.id)) }
+            }
+        } label: {
+            VStack(spacing: 3) {
+                Circle()
+                    .fill(item.id == "head_none" ? Color.white.opacity(0.12) : Color(uiColor: item.color))
+                    .frame(width: 38, height: 38)
+                    .overlay(Circle().stroke(selected ? Color.white : Color.clear, lineWidth: 3))
+                    .opacity(owned ? 1 : 0.3)
+                Text(owned ? CosmeticNaming.name(item.id) : "\(item.cost)")
+                    .font(.system(size: 9))
+                    .foregroundColor(.white.opacity(owned ? 0.9 : 0.5))
+            }
+        }
+        .disabled(!owned)
+    }
+}
+
+// A simple SwiftUI preview of the layered avatar (mirrors AvatarRenderer order).
+struct AvatarPreview: View {
+    let avatar: Avatar
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            VStack(spacing: 0) {
+                Rectangle().fill(Color(uiColor: Catalog.color(avatar.hair)))
+                    .frame(width: w * 0.78, height: h * 0.13)
+                Rectangle().fill(Color(uiColor: Catalog.color(avatar.skin)))
+                    .frame(width: w * 0.74, height: h * 0.17)
+                Rectangle().fill(Color(uiColor: Catalog.color(avatar.shirt)))
+                    .frame(width: w * 0.92, height: h * 0.34)
+                Rectangle().fill(Color(uiColor: Catalog.color(avatar.pants)))
+                    .frame(width: w * 0.80, height: h * 0.30)
+            }
+            .frame(width: w, height: h, alignment: .bottom)
+        }
+    }
+}
+
+struct SmallButtonStyle: ButtonStyle {
+    let prominent: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundColor(.white)
+            .frame(width: 130, height: 44)
+            .background(RoundedRectangle(cornerRadius: 10)
+                .fill(prominent ? Color.blue.opacity(0.85) : Color.white.opacity(0.15)))
+            .opacity(configuration.isPressed ? 0.7 : 1.0)
+    }
+}
+
+enum CosmeticNaming {
+    static func name(_ id: String) -> String {
+        let parts = id.split(separator: "_")
+        if id.hasPrefix("skin_"), let n = parts.last { return "Tone \(n)" }
+        return parts.dropFirst().joined(separator: " ").capitalized
+    }
+    static func slotTitle(_ slot: String) -> String {
+        switch slot {
+        case "skin": return "Skin"
+        case "hair": return "Hair"
+        case "shirt": return "Shirt"
+        case "pants": return "Pants"
+        case "head": return "Head"
+        case "trail": return "Arrow Trail"
+        default: return slot.capitalized
+        }
     }
 }

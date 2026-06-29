@@ -6,6 +6,20 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 
 ## [Unreleased]
 
+### Character creator + store (2026-06-29)
+- Replaced single-skin cosmetics with a layered avatar: skin tone, hair color,
+  shirt, pants, head accessory, and arrow trail. Rendered as original blocky art
+  (AvatarRenderer); both players' avatars travel in the match START.
+- Coin economy: coins earned per match (server-authoritative). Store sells head
+  accessories (cap/helmet/horns/halo/crown), premium hair/shirt colors, and
+  arrow trails for coins. Free base options for skin/hair/shirt/pants.
+- Server: item catalog with slots + costs; profile gains coins + owned[]; RPCs
+  match_end (now awards coins), get_profile, set_avatar (validates ownership),
+  purchase (validates balance, deducts, grants). Storage stays server-write-only.
+- Client: Customize screen (equip owned per slot, avatar preview) and Store
+  screen (buy with coins); menu shows level/XP/coins.
+- IAP note: coins only for now; real-money purchases can be layered on later.
+
 ### Content - 10 maps + 9 characters (2026-06-29)
 - Added a `Maps` catalog: 10 original 20x12 arenas (Arena, Pillars, Stairs,
   Towers, Cross, Ledges, Bridges, Diamond, Layers, Scatter) with per-map spawns.

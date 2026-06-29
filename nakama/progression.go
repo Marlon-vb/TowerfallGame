@@ -1,8 +1,8 @@
 // progression.go
-// Server-authoritative progression: profile storage, XP from match results, the
-// leaderboard, and loadout changes. The client can never write the profile
-// directly (storage write permission is server-only); all changes flow through
-// these RPCs, which compute values server-side.
+// Server-authoritative progression: profile storage, XP + coins from match
+// results, the leaderboard, store purchases, and avatar changes. The client can
+// never write the profile directly (storage write permission is server-only);
+// all changes flow through these RPCs, which compute values server-side.
 
 package main
 
@@ -46,6 +46,12 @@ func loadProfile(ctx context.Context, nk runtime.NakamaModule, userID string) (P
 	if profile.Level < 1 {
 		profile.Level = 1
 	}
+	if profile.Owned == nil {
+		profile.Owned = []string{}
+	}
+	if profile.Avatar.Skin == "" {
+		profile.Avatar = defaultAvatar()
+	}
 	return profile, nil
 }
 
@@ -66,15 +72,15 @@ func saveProfile(ctx context.Context, nk runtime.NakamaModule, userID string, pr
 	return err
 }
 
-func loadoutForUser(ctx context.Context, nk runtime.NakamaModule, userID string) Loadout {
+func avatarForUser(ctx context.Context, nk runtime.NakamaModule, userID string) Avatar {
 	profile, err := loadProfile(ctx, nk, userID)
 	if err != nil {
-		return defaultLoadout()
+		return defaultAvatar()
 	}
-	return profile.Loadout
+	return profile.Avatar
 }
 
-// MARK: RPCs
+// MARK: context helpers
 
 func userIDFromContext(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
@@ -85,6 +91,8 @@ func usernameFromContext(ctx context.Context) string {
 	username, _ := ctx.Value(runtime.RUNTIME_CTX_USERNAME).(string)
 	return username
 }
+
+// MARK: RPCs
 
 type matchEndRequest struct {
 	Won    bool `json:"won"`
@@ -107,6 +115,7 @@ func rpcMatchEnd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		return "", err
 	}
 	profile.XP += xpForMatch(req.Won, req.Kills)
+	profile.Coins += coinsForMatch(req.Won, req.Kills)
 	profile.Level = levelForXP(profile.XP)
 
 	if err := saveProfile(ctx, nk, userID, profile); err != nil {
@@ -118,11 +127,7 @@ func rpcMatchEnd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		logger.Warn("leaderboard write failed: %v", err)
 	}
 
-	out, err := json.Marshal(profile)
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
+	return marshalProfile(profile)
 }
 
 func rpcGetProfile(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
@@ -134,23 +139,18 @@ func rpcGetProfile(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	if err != nil {
 		return "", err
 	}
-	// Persist a default profile on first read so it exists for match handlers.
 	if err := saveProfile(ctx, nk, userID, profile); err != nil {
 		logger.Warn("could not persist default profile: %v", err)
 	}
-	out, err := json.Marshal(profile)
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
+	return marshalProfile(profile)
 }
 
-func rpcSetLoadout(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+func rpcSetAvatar(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userID, ok := userIDFromContext(ctx)
 	if !ok {
 		return "", errNoUser
 	}
-	var requested Loadout
+	var requested Avatar
 	if err := json.Unmarshal([]byte(payload), &requested); err != nil {
 		return "", err
 	}
@@ -160,19 +160,70 @@ func rpcSetLoadout(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 		return "", err
 	}
 
-	// Validate that each chosen cosmetic exists, is the right kind, and is owned.
-	if cosmeticKind(requested.Skin) != "skin" || !isOwned(requested.Skin, profile.Level) {
-		return "", errors.New("skin not unlocked")
+	// Every equipped item must exist, match its slot, and be owned.
+	parts := []struct{ id, slot string }{
+		{requested.Skin, "skin"},
+		{requested.Hair, "hair"},
+		{requested.Shirt, "shirt"},
+		{requested.Pants, "pants"},
+		{requested.Head, "head"},
+		{requested.Trail, "trail"},
 	}
-	if cosmeticKind(requested.Trail) != "trail" || !isOwned(requested.Trail, profile.Level) {
-		return "", errors.New("trail not unlocked")
+	for _, p := range parts {
+		if !itemInSlot(p.id, p.slot) {
+			return "", errors.New("invalid item for slot " + p.slot)
+		}
+		if !ownsItem(profile, p.id) {
+			return "", errors.New("item not owned: " + p.id)
+		}
 	}
 
-	profile.Loadout = requested
+	profile.Avatar = requested
 	if err := saveProfile(ctx, nk, userID, profile); err != nil {
 		return "", err
 	}
+	return marshalProfile(profile)
+}
 
+type purchaseRequest struct {
+	ItemID string `json:"itemId"`
+}
+
+func rpcPurchase(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	userID, ok := userIDFromContext(ctx)
+	if !ok {
+		return "", errNoUser
+	}
+	var req purchaseRequest
+	if err := json.Unmarshal([]byte(payload), &req); err != nil {
+		return "", err
+	}
+
+	item, exists := itemByID(req.ItemID)
+	if !exists || item.Cost <= 0 {
+		return "", errors.New("item not purchasable")
+	}
+
+	profile, err := loadProfile(ctx, nk, userID)
+	if err != nil {
+		return "", err
+	}
+	if ownsItem(profile, req.ItemID) {
+		return "", errors.New("already owned")
+	}
+	if profile.Coins < item.Cost {
+		return "", errors.New("not enough coins")
+	}
+
+	profile.Coins -= item.Cost
+	profile.Owned = append(profile.Owned, req.ItemID)
+	if err := saveProfile(ctx, nk, userID, profile); err != nil {
+		return "", err
+	}
+	return marshalProfile(profile)
+}
+
+func marshalProfile(profile Profile) (string, error) {
 	out, err := json.Marshal(profile)
 	if err != nil {
 		return "", err
@@ -180,5 +231,5 @@ func rpcSetLoadout(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	return string(out), nil
 }
 
-// Ensure the api package import is retained for storage object typing.
+// Keep the api import (storage object typing).
 var _ = api.StorageObject{}

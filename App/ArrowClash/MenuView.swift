@@ -17,7 +17,7 @@ struct MenuView: View {
                     .foregroundColor(.white)
 
                 if let profile = profileService.profile {
-                    Text("Level \(profile.level)   -   \(profile.xp) XP")
+                    Text("Level \(profile.level)   -   \(profile.xp) XP   -   \(profile.coins) coins")
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.8))
                 }
@@ -32,7 +32,9 @@ struct MenuView: View {
                         .buttonStyle(MenuButtonStyle(prominent: true))
                     Button("Local Practice") { model.startLocalPractice() }
                         .buttonStyle(MenuButtonStyle(prominent: false))
-                    Button("Loadout") { model.openLoadout() }
+                    Button("Customize") { model.openCustomize() }
+                        .buttonStyle(MenuButtonStyle(prominent: false))
+                    Button("Store") { model.openStore() }
                         .buttonStyle(MenuButtonStyle(prominent: false))
                     Button("Settings") { model.openSettings() }
                         .buttonStyle(MenuButtonStyle(prominent: false))

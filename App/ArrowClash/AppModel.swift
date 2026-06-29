@@ -11,7 +11,8 @@ import ArrowClashNet
 final class AppModel: ObservableObject {
     enum Screen {
         case menu
-        case loadout
+        case customize
+        case store
         case settings
         case searching
         case playing
@@ -41,9 +42,9 @@ final class AppModel: ObservableObject {
     func startLocalPractice() {
         mode = .local
         matchResult = nil
-        let own = profileService.profile?.loadout ?? .default
+        let own = profileService.profile?.avatar ?? .default
         let map = Maps.all.randomElement() ?? Maps.default
-        scene = makeScene(driver: LocalDriver(map: map), loadouts: [own, .default], map: map)
+        scene = makeScene(driver: LocalDriver(map: map), avatars: [own, .default], map: map)
         screen = .playing
     }
 
@@ -66,24 +67,30 @@ final class AppModel: ObservableObject {
                 self?.screen = .menu
             }
         }
-        controller.onReady = { [weak self] session, loadouts, map in
+        controller.onReady = { [weak self] session, avatars, map in
             Task { @MainActor in
                 guard let self = self else { return }
                 let driver = OnlineDriver(session: session)
-                self.scene = self.makeScene(driver: driver, loadouts: loadouts, map: map)
+                self.scene = self.makeScene(driver: driver, avatars: avatars, map: map)
                 self.screen = .playing
             }
         }
         controller.start()
     }
 
-    func openLoadout() {
+    func openCustomize() {
         profileService.serverHost = Settings.serverHost
-        screen = .loadout
+        screen = .customize
         Task { await profileService.refresh() }
     }
 
-    func closeLoadout() {
+    func openStore() {
+        profileService.serverHost = Settings.serverHost
+        screen = .store
+        Task { await profileService.refresh() }
+    }
+
+    func backToMenu() {
         screen = .menu
     }
 
@@ -123,15 +130,13 @@ final class AppModel: ObservableObject {
         screen = .menu
     }
 
-    private func makeScene(driver: SceneDriver, loadouts: [CosmeticLoadout], map: MapDefinition) -> GameScene {
-        var ld = loadouts
-        while ld.count < 2 { ld.append(.default) }
-        let skins = ld.map { Cosmetics.skinColor($0.skin) }
-        let trails = ld.map { Cosmetics.trailColor($0.trail) }
+    private func makeScene(driver: SceneDriver, avatars: [Avatar], map: MapDefinition) -> GameScene {
+        var av = avatars
+        while av.count < 2 { av.append(.default) }
         let theme = MapThemes.theme(for: map.id)
 
         let scene = GameScene(input: input, driver: driver, map: map,
-                              skinColors: skins, trailColors: trails,
+                              avatars: av,
                               tileColor: theme.tile, bgColor: theme.background)
         scene.onMatchEnd = { [weak self] won, kills, rounds in
             Task { @MainActor in
