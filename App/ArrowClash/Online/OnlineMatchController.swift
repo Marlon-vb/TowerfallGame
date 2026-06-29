@@ -68,8 +68,9 @@ final class OnlineMatchController {
             let session = try await client.authenticateDevice(id: auth.identifier(), create: true, username: nil, vars: nil, retryConfig: nil)
             self.nakamaSession = session
 
-            let socket = client.createSocket(host: nil, port: nil, ssl: nil, socketAdapter: nil)
-            self.socket = socket
+            // SocketProtocol is not class-constrained, so a mutable binding is
+            // required to set its callback properties.
+            var socket = client.createSocket(host: nil, port: nil, ssl: nil, socketAdapter: nil)
 
             socket.onError = { [weak self] error in
                 self?.onError?("\(error)")
@@ -84,7 +85,8 @@ final class OnlineMatchController {
                 Task { await self?.enterMatchmaking() }
             }
 
-            socket.connect(session: session)
+            self.socket = socket
+            socket.connect(session: session, appearOnline: nil)
         } catch {
             onError?("\(error)")
         }
