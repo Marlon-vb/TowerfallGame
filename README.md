@@ -6,11 +6,12 @@ rollback netcode.
 
 This repository is being built in phases. See `docs/` for the per-phase notes.
 
-## Current status: Phase 0 (deterministic sim core)
+## Current status: Phase 1 (local render harness)
 
-The deterministic game simulation exists as a standalone Swift package with
-zero UIKit/SpriteKit dependencies, plus a minimal iOS app shell that links it.
-No gameplay rendering yet (that is Phase 1).
+The deterministic sim (standalone Swift package, zero UIKit/SpriteKit deps) now
+includes arrows (shoot + reclaim). A SpriteKit scene renders the sim and feeds
+it local touch input so one character can be played in the arena. See
+`docs/PHASE1.md`. Phase 0's determinism gate still holds.
 
 ## Layout
 

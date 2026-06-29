@@ -19,11 +19,24 @@ public enum Simulation {
         config: GameConfig
     ) {
         let count = state.players.count
+
+        // Capture each player's previous buttons before stepping, because step
+        // overwrites prevButtons and the arrow shoot edge needs the old value.
+        var priorButtons = [UInt8](repeating: 0, count: count)
         var i = 0
+        while i < count {
+            priorButtons[i] = state.players[i].prevButtons
+            i += 1
+        }
+
+        i = 0
         while i < count {
             step(player: &state.players[i], input: inputs[i], map: map, config: config)
             i += 1
         }
+
+        updateArrows(state: &state, inputs: inputs, priorButtons: priorButtons, map: map, config: config)
+
         state.tick &+= 1
     }
 
@@ -259,5 +272,131 @@ public enum Simulation {
         } else if centerY.raw >= worldH.raw {
             p.pos.y -= worldH
         }
+    }
+
+    // MARK: - Arrows
+    //
+    // Order: spawn newly fired arrows, move flying arrows (sticking on tile
+    // contact), then reclaim settled arrows the players walk over. Spawning
+    // before moving means a freshly fired arrow is never stuck on its spawn
+    // tick, so it cannot be reclaimed instantly by its own shooter.
+
+    private static func updateArrows(
+        state: inout GameState,
+        inputs: [InputCommand],
+        priorButtons: [UInt8],
+        map: TileMap,
+        config: GameConfig
+    ) {
+        let shootBit = InputCommand.Buttons.shoot.rawValue
+
+        // 1. Shoot (on press edge, if the quiver has an arrow and a slot is free).
+        var i = 0
+        while i < state.players.count {
+            let buttons = inputs[i].buttons.rawValue
+            let shootPressed = (buttons & shootBit) != 0 && (priorButtons[i] & shootBit) == 0
+            if shootPressed && state.players[i].arrows > 0 {
+                if let slot = freeArrowSlot(state.arrows) {
+                    let p = state.players[i]
+                    let center = FixedVec(
+                        x: p.pos.x + config.playerWidth / Fixed(2),
+                        y: p.pos.y + config.playerHeight / Fixed(2)
+                    )
+                    let dir = inputs[i].aim
+                    let unit = AimTable.unit(dir)
+                    let spawn = FixedVec(
+                        x: center.x + unit.x * config.arrowSpawnOffset,
+                        y: center.y + unit.y * config.arrowSpawnOffset
+                    )
+                    state.arrows[slot] = ArrowState(
+                        pos: spawn,
+                        vel: FixedVec(x: unit.x * config.arrowSpeed, y: unit.y * config.arrowSpeed),
+                        active: true,
+                        stuck: false,
+                        owner: Int8(i),
+                        dir: dir
+                    )
+                    state.players[i].arrows -= 1
+                }
+            }
+            i += 1
+        }
+
+        // 2. Move flying arrows. Point vs tile; stick on contact.
+        var a = 0
+        while a < state.arrows.count {
+            if state.arrows[a].active && !state.arrows[a].stuck {
+                stepArrow(&state.arrows[a], map: map, config: config)
+            }
+            a += 1
+        }
+
+        // 3. Reclaim settled arrows. A player overlapping a stuck arrow picks it
+        //    up if their quiver is not full. Players checked in index order.
+        a = 0
+        while a < state.arrows.count {
+            if state.arrows[a].active && state.arrows[a].stuck {
+                var pi = 0
+                while pi < state.players.count {
+                    if state.players[pi].arrows < config.startingArrows
+                        && pointInPlayer(state.arrows[a].pos, player: state.players[pi], config: config) {
+                        state.players[pi].arrows += 1
+                        state.arrows[a] = .empty
+                        break
+                    }
+                    pi += 1
+                }
+            }
+            a += 1
+        }
+    }
+
+    private static func freeArrowSlot(_ arrows: [ArrowState]) -> Int? {
+        var a = 0
+        while a < arrows.count {
+            if !arrows[a].active { return a }
+            a += 1
+        }
+        return nil
+    }
+
+    private static func stepArrow(_ arrow: inout ArrowState, map: TileMap, config: GameConfig) {
+        // Gravity (light arc).
+        arrow.vel.y += config.arrowGravity
+        if arrow.vel.y > config.arrowMaxFallSpeed {
+            arrow.vel.y = config.arrowMaxFallSpeed
+        }
+
+        let previous = arrow.pos
+        arrow.pos = FixedVec(x: arrow.pos.x + arrow.vel.x, y: arrow.pos.y + arrow.vel.y)
+
+        // Point collision: if the new position is inside a solid tile, stick at
+        // the pre-move position so the arrow rests against the surface. Valid
+        // while arrow speed stays below tileSize (see GameConfig).
+        let col = TileMap.tileIndex(arrow.pos.x, tileSize: config.tileSize)
+        let row = TileMap.tileIndex(arrow.pos.y, tileSize: config.tileSize)
+        if map.isSolid(col: col, row: row) {
+            arrow.pos = previous
+            arrow.vel = .zero
+            arrow.stuck = true
+            return
+        }
+
+        // Wrap on both axes, like players.
+        let worldW = Fixed(map.cols * config.tileSize)
+        let worldH = Fixed(map.rows * config.tileSize)
+        if arrow.pos.x.raw < 0 { arrow.pos.x += worldW }
+        else if arrow.pos.x.raw >= worldW.raw { arrow.pos.x -= worldW }
+        if arrow.pos.y.raw < 0 { arrow.pos.y += worldH }
+        else if arrow.pos.y.raw >= worldH.raw { arrow.pos.y -= worldH }
+    }
+
+    private static func pointInPlayer(_ point: FixedVec, player p: PlayerState, config: GameConfig) -> Bool {
+        let left = p.pos.x
+        let right = p.pos.x + config.playerWidth
+        let top = p.pos.y
+        let bottom = p.pos.y + config.playerHeight
+        return point.x.raw >= left.raw && point.x.raw < right.raw
+            && point.y.raw >= top.raw && point.y.raw < bottom.raw
     }
 }

@@ -32,6 +32,19 @@ public func stateHash(_ state: GameState) -> UInt64 {
         mix32(p.dashActiveTimer)
         mix32(p.dashCooldownTimer)
         mix(UInt64(p.prevButtons))
+        mix(UInt64(bitPattern: Int64(p.arrows)))
+    }
+
+    mix(UInt64(state.arrows.count))
+    for arrow in state.arrows {
+        mix32(arrow.pos.x.raw)
+        mix32(arrow.pos.y.raw)
+        mix32(arrow.vel.x.raw)
+        mix32(arrow.vel.y.raw)
+        mix(arrow.active ? 1 : 0)
+        mix(arrow.stuck ? 1 : 0)
+        mix(UInt64(UInt8(bitPattern: arrow.owner)))
+        mix(UInt64(arrow.dir))
     }
 
     return hash

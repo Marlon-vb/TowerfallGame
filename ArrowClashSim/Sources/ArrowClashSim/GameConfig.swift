@@ -47,6 +47,10 @@ public struct GameConfig: Equatable {
 
     // Combat (used from Phase 1 onward, declared here so config is one file).
     public var startingArrows: Int
+    public var arrowSpeed: Fixed        // initial speed of a fired arrow, px/tick
+    public var arrowGravity: Fixed      // light gravity so arrows arc, px/tick^2
+    public var arrowMaxFallSpeed: Fixed // terminal fall speed for arrows
+    public var arrowSpawnOffset: Fixed  // distance from player center to spawn the arrow
 
     // Spawn points for the default arena (see TileMap.defaultArena).
     // Both spawn on top of the central platform.
@@ -74,6 +78,10 @@ public struct GameConfig: Equatable {
         dashDurationTicks: Int32 = 8,                             // ~0.13s
         dashCooldownTicks: Int32 = 30,                            // ~0.5s
         startingArrows: Int = 3,
+        arrowSpeed: Fixed = Fixed(7),                            // 7.0
+        arrowGravity: Fixed = Fixed(numerator: 1, denominator: 5), // 0.2
+        arrowMaxFallSpeed: Fixed = Fixed(8),                     // 8.0
+        arrowSpawnOffset: Fixed = Fixed(8),                      // 8 px ahead of center
         spawnX0: Int = 112,
         spawnX1: Int = 192,
         spawnY: Int = 82
@@ -97,6 +105,10 @@ public struct GameConfig: Equatable {
         self.dashDurationTicks = dashDurationTicks
         self.dashCooldownTicks = dashCooldownTicks
         self.startingArrows = startingArrows
+        self.arrowSpeed = arrowSpeed
+        self.arrowGravity = arrowGravity
+        self.arrowMaxFallSpeed = arrowMaxFallSpeed
+        self.arrowSpawnOffset = arrowSpawnOffset
         self.spawnX0 = spawnX0
         self.spawnX1 = spawnX1
         self.spawnY = spawnY
