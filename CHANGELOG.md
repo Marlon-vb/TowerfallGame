@@ -6,6 +6,20 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 
 ## [Unreleased]
 
+### Hand-drawn chibi character art in-game (2026-06-30)
+- Replaced the PixelLab base body with hand-generated chibi poses (ChatGPT image
+  creator, from the canonical prompt in docs/CHARACTER_STYLE.md): idle, run (x2),
+  jump, fall, dash, shoot (draw + release), die. Bald base in grey shorts.
+- New `tools/normalize_sprites.py`: takes raw exports from
+  Sprites/incoming/<state>/ (any size, white or transparent bg), keys white to
+  transparent via corner flood fill, binarizes alpha to kill haze, trims, scales,
+  and bottom-aligns each into uniform 64x64 transparent frames in Sprites/skin/.
+- `FileSpriteProvider`: 64x64 native frame size, new per-state frame counts,
+  start indices reset to 0; frames are transparent (no runtime keying).
+- Updated Sprites/skin/NOTES.md to the new art + regeneration workflow; removed
+  the stale PixelLab rotations/.
+- Bow is baked into the shoot frames for now (overlay split deferred).
+
 ### Real base-body sprites in-game (2026-06-29)
 - `FileSpriteProvider` loads the PixelLab-generated base body (per-frame PNGs in
   Sprites/skin/<state>, 68x68, east-only mirrored for left, full color) matching

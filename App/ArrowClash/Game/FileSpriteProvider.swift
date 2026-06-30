@@ -1,9 +1,8 @@
 // FileSpriteProvider.swift
-// Loads real per-frame PNGs produced by PixelLab from the app bundle
-// (Sprites/skin/<state>/east_<i>.png). Matches the actual output documented in
-// App/ArrowClash/Sprites/skin/NOTES.md: 68x68 frames, east-only (the scene
-// mirrors for left), full color (no tint), per-state frame counts with some
-// leading reference frames skipped.
+// Loads real per-frame PNGs from the app bundle (Sprites/skin/<state>/east_<i>.png).
+// These are the hand-generated chibi poses normalized by tools/normalize_sprites.py
+// into uniform 64x64 transparent frames, east-only (the scene mirrors for left),
+// full color (no tint). See App/ArrowClash/Sprites/skin/NOTES.md.
 //
 // Only the base body ("skin") has art today; other layers return nil (hidden)
 // until their sheets exist. Swap-in point for the layered pipeline.
@@ -15,9 +14,9 @@ final class FileSpriteProvider: SpriteProvider {
 
     static let shared = FileSpriteProvider()
 
-    let nativeFrameSize = CGSize(width: 68, height: 68)
+    let nativeFrameSize = CGSize(width: 64, height: 64)
 
-    // start = first file index to use (skips PixelLab reference frames).
+    // start = first file index to use (kept for forward-compat; all 0 now).
     private struct Anim {
         let folder: String
         let start: Int
@@ -26,14 +25,16 @@ final class FileSpriteProvider: SpriteProvider {
         let loop: Bool
     }
 
+    // One key pose per state today (run/shoot have two). Single-frame states
+    // hold their pose; add frames by dropping more PNGs and bumping count.
     private let anims: [AnimState: Anim] = [
-        .idle:  Anim(folder: "idle",  start: 0, count: 4, fps: 6,  loop: true),
-        .run:   Anim(folder: "run",   start: 0, count: 8, fps: 14, loop: true),
-        .jump:  Anim(folder: "jump",  start: 0, count: 9, fps: 12, loop: false),
-        .fall:  Anim(folder: "fall",  start: 1, count: 4, fps: 10, loop: false),
-        .dash:  Anim(folder: "dash",  start: 1, count: 4, fps: 16, loop: false),
-        .shoot: Anim(folder: "shoot", start: 0, count: 5, fps: 18, loop: false),
-        .die:   Anim(folder: "die",   start: 0, count: 7, fps: 10, loop: false),
+        .idle:  Anim(folder: "idle",  start: 0, count: 1, fps: 2,  loop: true),
+        .run:   Anim(folder: "run",   start: 0, count: 2, fps: 10, loop: true),
+        .jump:  Anim(folder: "jump",  start: 0, count: 1, fps: 1,  loop: false),
+        .fall:  Anim(folder: "fall",  start: 0, count: 1, fps: 1,  loop: false),
+        .dash:  Anim(folder: "dash",  start: 0, count: 1, fps: 1,  loop: false),
+        .shoot: Anim(folder: "shoot", start: 0, count: 2, fps: 14, loop: false),
+        .die:   Anim(folder: "die",   start: 0, count: 1, fps: 1,  loop: false),
     ]
 
     private var cache: [String: SKTexture] = [:]

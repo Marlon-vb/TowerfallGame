@@ -40,7 +40,14 @@ FILL = 0.92
 # Pixels of empty space below the feet inside the frame.
 FOOT_MARGIN = 1
 # How close to white counts as background when keying (0-255 per channel).
-WHITE_TOL = 26
+WHITE_TOL = 60
+# Alpha at/above this is treated as solid; below is dropped. Binarizing gives
+# crisp pixel edges and removes the faint anti-alias haze some exports carry
+# all the way out to the canvas edges (which would otherwise inflate the bbox).
+ALPHA_THR = 96
+# If fewer than this fraction of pixels are already transparent, treat the image
+# as having a solid (white) background that needs keying.
+TRANSPARENT_FRACTION = 0.20
 
 
 def key_white_background(img: Image.Image) -> Image.Image:
@@ -79,8 +86,25 @@ def key_white_background(img: Image.Image) -> Image.Image:
     return img
 
 
+def clean_alpha(img: Image.Image) -> Image.Image:
+    """Return an RGBA image with a crisp, haze-free alpha channel.
+
+    Keys a white background only when the image is mostly opaque (so images that
+    already ship real transparency are trusted as-is), then binarizes alpha at
+    ALPHA_THR to drop faint anti-alias haze and give clean pixel edges.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    transparent = img.getchannel("A").histogram()[0]
+    if transparent < w * h * TRANSPARENT_FRACTION:
+        img = key_white_background(img)
+    mask = img.getchannel("A").point(lambda v: 255 if v >= ALPHA_THR else 0)
+    img.putalpha(mask)
+    return img
+
+
 def normalize(img: Image.Image) -> Image.Image:
-    img = key_white_background(img)
+    img = clean_alpha(img)
     bbox = img.getbbox()
     if bbox is None:
         raise ValueError("image is empty after background removal")
