@@ -63,8 +63,9 @@ shorts, bare feet, no shoes, no accessories, no tattoos. Arms resting naturally
 at the sides, slightly separated from the torso to allow clothing overlays.
 
 Character centered in frame, full body visible head to feet, feet near the
-bottom edge, SAME zoom/scale in every image. Background flat solid magenta
-(#FF00FF). No shadow. No ground. No text. No extra objects.
+bottom edge, SAME zoom/scale in every image. Fully TRANSPARENT background
+(alpha channel, no background colour). No cast shadow, no drop shadow, no
+ground, no text, no extra objects.
 
 Consistent side-view template, perfectly vertical posture, clean pixel
 alignment so future hair, helmets, shirts, gloves, pants and shoes layer
@@ -72,9 +73,55 @@ directly over the base without changing proportions.
 ```
 
 Locked canon (keep identical everywhere): ~2 heads tall, head ~50% height;
-thick DARK NAVY outline; 10-16 colour flat palette + one shadow tone; two tiny
-black eyes, single-pixel nose, no mouth; magenta background; side profile
-facing right; same zoom with feet near the bottom edge.
+thick DARK NAVY outline; 10-16 colour flat palette + one shadow tone for
+shading (no CAST/drop shadow); two tiny black eyes, single-pixel nose, no
+mouth; TRANSPARENT background; side profile facing right; same zoom with feet
+near the bottom edge.
+
+## Per-pose prompt template (reuse for every animation frame)
+
+For each animation frame, UPLOAD the approved base image as a reference, then
+paste the block below and fill in the POSE line. Everything except the POSE
+line stays identical so frames register and don't drift between generations.
+
+```
+A single 2D pixel-art character sprite, full body, side-view profile facing
+RIGHT. SAME character as the reference image (same proportions, same colours,
+same thick dark navy outline, same bald head and light grey shorts).
+
+Cute retro indie-game pixel art style. Approximately 2 heads tall, very large
+rounded head (about half the total height), tiny torso, short chunky arms,
+stubby legs. Pixel art only. Crisp square pixels. No anti-aliasing. No
+smoothing. No painterly effects. Limited palette of roughly 10-16 colours.
+Flat colours with only one simple shadow tone for shading.
+
+POSE: <describe the action here>
+
+Character centered, full body head to feet, feet near the bottom edge, SAME
+zoom/scale as the reference. Fully TRANSPARENT background (alpha channel, no
+background colour). No cast shadow, no drop shadow, no ground, no text, no
+extra objects.
+```
+
+POSE lines per state (frame files go to `Sprites/skin/<state>/east_<i>.png`):
+
+- idle  `east_0` - relaxed neutral standing pose (the approved base).
+- run   `east_0` - mid-stride CONTACT: front leg reaching forward and planted,
+  back leg extended behind, slight forward lean, arms swinging opposite.
+- run   `east_1` - PASSING: legs crossing under the body, one knee lifted high
+  in front, body bobbed up slightly, arms at the opposite extreme.
+- jump  `east_0` - rising: both legs tucked up, knees bent, arms raised a
+  little, body stretched upward, airborne and energetic.
+- fall  `east_0` - descending: legs reaching down to land, arms out slightly
+  for balance, body leaning a touch forward.
+- dash  `east_0` - horizontal burst: strong forward lean, arms pulled back
+  behind the body, legs trailing, angled like bursting forward at speed.
+- shoot `east_0` - drawing a bow: front arm extended forward holding a bow,
+  back arm bent pulling the string near the face, feet planted.
+- shoot `east_1` - releasing: front arm still forward holding the bow, back arm
+  snapped open, slight recoil lean back.
+- die   `east_0` - knocked back: body tipped backward off balance, arms flung
+  up, one leg lifting off the ground, eyes as simple shocked dots.
 
 ## Honest note on AI consistency
 
