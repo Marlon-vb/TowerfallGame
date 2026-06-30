@@ -22,3 +22,7 @@ App/ArrowClash/Info.plist
 # Go plugin build artifacts
 *.so
 nakama/vendor/
+
+# Python
+__pycache__/
+*.pyc
