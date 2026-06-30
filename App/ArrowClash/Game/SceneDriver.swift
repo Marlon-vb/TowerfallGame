@@ -7,10 +7,23 @@
 import ArrowClashSim
 import ArrowClashNet
 
+// Coarse link health for the renderer (banner + forfeit). Local play is always
+// healthy; online maps from the rollback session.
+enum LinkStatus {
+    case healthy       // playing normally
+    case waiting       // peer quiet / prediction barrier reached - hold + show banner
+    case disconnected  // peer gone past timeout - forfeit
+}
+
 protocol SceneDriver: AnyObject {
     var localPlayer: Int { get }
     func advance(localInput: InputCommand)
     func renderStates() -> (previous: GameState, current: GameState)
+    var linkStatus: LinkStatus { get }
+}
+
+extension SceneDriver {
+    var linkStatus: LinkStatus { .healthy }
 }
 
 // Local single-player practice: player 1 is an idle dummy.
@@ -59,5 +72,13 @@ final class OnlineDriver: SceneDriver {
 
     func renderStates() -> (previous: GameState, current: GameState) {
         return (previous, session.latestState)
+    }
+
+    var linkStatus: LinkStatus {
+        switch session.connectionState {
+        case .disconnected: return .disconnected
+        case .unstable: return .waiting
+        case .healthy: return session.isStalled ? .waiting : .healthy
+        }
     }
 }

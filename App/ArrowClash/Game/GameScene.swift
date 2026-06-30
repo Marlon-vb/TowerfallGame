@@ -30,6 +30,7 @@ final class GameScene: SKScene {
     private var hud = SKLabelNode()
     private var scoreLabel = SKLabelNode()
     private var centerLabel = SKLabelNode()
+    private var connectionLabel = SKLabelNode()
     private var flash = SKSpriteNode()
     private var vignetteNode = SKSpriteNode()
     private var lastCenterText = ""
@@ -163,6 +164,16 @@ final class GameScene: SKScene {
         centerLabel.position = CGPoint(x: CGFloat(worldWidthPx) / 2, y: CGFloat(worldHeightPx) * 0.62)
         centerLabel.zPosition = 60
         addChild(centerLabel)
+
+        connectionLabel.fontName = "Menlo-Bold"
+        connectionLabel.fontSize = 12
+        connectionLabel.fontColor = .yellow
+        connectionLabel.horizontalAlignmentMode = .center
+        connectionLabel.verticalAlignmentMode = .center
+        connectionLabel.position = CGPoint(x: CGFloat(worldWidthPx) / 2, y: CGFloat(worldHeightPx) * 0.42)
+        connectionLabel.zPosition = 60
+        connectionLabel.isHidden = true
+        addChild(connectionLabel)
     }
 
     private func buildFlash() {
@@ -195,7 +206,34 @@ final class GameScene: SKScene {
             detectEvents(previous: states.previous, current: states.current)
         }
 
+        updateConnectionBanner()
         renderInterpolated(alpha: Float(accumulator / tickDuration), dt: frameDelta)
+    }
+
+    // Surfaces link health during an online match: a banner while the peer is
+    // quiet (the session stalls rather than predicting forever), and a one-time
+    // forfeit win if the peer stays gone past the disconnect timeout.
+    private func updateConnectionBanner() {
+        switch driver.linkStatus {
+        case .healthy:
+            connectionLabel.isHidden = true
+        case .waiting:
+            connectionLabel.isHidden = false
+            connectionLabel.fontColor = .yellow
+            connectionLabel.text = "RECONNECTING..."
+        case .disconnected:
+            connectionLabel.isHidden = false
+            connectionLabel.fontColor = .red
+            connectionLabel.text = "OPPONENT DISCONNECTED"
+            if !matchEndFired {
+                matchEndFired = true
+                let state = driver.renderStates().current
+                let me = driver.localPlayer
+                let kills = me < state.scores.count ? state.scores[me] : 0
+                let rounds = state.scores.reduce(0, +)
+                onMatchEnd?(true, kills, rounds)
+            }
+        }
     }
 
     // MARK: - Juice (render-only)

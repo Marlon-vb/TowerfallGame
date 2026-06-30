@@ -367,6 +367,52 @@ do {
           "fuzz: 40 randomized scenarios all match reference (worst confirmed=\(worstConfirmed)/400)")
 }
 
+do {
+    // Hardening: long lossy match stays correct, with bounded memory and no
+    // false desync from the confirmed-frame checksum exchange.
+    let r = RollbackHarness.run(.init(frames: 5000, inputDelay: 2, latency: 5, jitter: 3, lossPerThousand: 150, seed: 11))
+    check(r.matchedReference && !r.desyncDetected && r.maxRetainedWindow < 256,
+          "5000-frame match: correct, no false desync, bounded window (\(r.maxRetainedWindow) frames)")
+}
+
+do {
+    // Hardening: divergent sessions (different seeds) are caught by the checksum
+    // exchange - the safety net behind the determinism guarantee.
+    let config = GameConfig.default
+    let frames = 200
+    let raw = RollbackHarness.makeInputs(frames: frames, seed: 99)
+    let net = SimulatedNetwork(latency: 2, seed: 5)
+    let a = RollbackSession(localPlayer: 0, transport: net.endpointA, config: config, seed: 1)
+    let b = RollbackSession(localPlayer: 1, transport: net.endpointB, config: config, seed: 2)
+    for f in 0..<frames {
+        a.step(localInput: raw[0][f])
+        b.step(localInput: raw[1][f])
+        net.advance()
+        if let ca = a.localChecksum() { b.ingestPeerChecksum(frame: ca.frame, hash: ca.hash) }
+        if let cb = b.localChecksum() { a.ingestPeerChecksum(frame: cb.frame, hash: cb.hash) }
+    }
+    check(a.desyncDetected || b.desyncDetected,
+          "checksum exchange detects diverging sessions")
+}
+
+do {
+    // Hardening: a silent peer drives the session into the prediction barrier
+    // (stall, no unbounded prediction) and reads as disconnected past timeout.
+    let config = GameConfig.default
+    let net = SimulatedNetwork(latency: 2, seed: 1)
+    let a = RollbackSession(localPlayer: 0, transport: net.endpointA, config: config, seed: 7,
+                            inputDelay: 2, maxPredictionFrames: 10,
+                            unstableTimeoutFrames: 10, disconnectTimeoutFrames: 40)
+    let b = RollbackSession(localPlayer: 1, transport: net.endpointB, config: config, seed: 7, inputDelay: 2)
+    for _ in 0..<20 { a.step(localInput: .neutral); b.step(localInput: .neutral); net.advance() }
+    let healthy = (a.connectionState == .healthy)
+    for _ in 0..<60 { a.step(localInput: .neutral); net.advance() }
+    let frozen = a.currentFrame
+    for _ in 0..<10 { a.step(localInput: .neutral); net.advance() }
+    check(healthy && a.isStalled && a.connectionState == .disconnected && a.currentFrame == frozen,
+          "silent peer: session stalls at the prediction barrier and reports disconnected")
+}
+
 // MARK: - Summary
 
 print("")

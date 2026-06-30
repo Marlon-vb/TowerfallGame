@@ -43,6 +43,8 @@ public enum RollbackHarness {
         public var firstMismatch: Int?     // first frame that disagreed, if any
         public var rollbacksA: Int
         public var rollbacksB: Int
+        public var desyncDetected: Bool    // either peer's checksum exchange flagged a desync
+        public var maxRetainedWindow: Int  // largest per-session retained frame count seen
     }
 
     // Per-player raw input streams (indexed [player][callIndex]).
@@ -98,18 +100,26 @@ public enum RollbackHarness {
         let a = RollbackSession(localPlayer: 0, transport: net.endpointA, config: config, seed: seed, inputDelay: scenario.inputDelay)
         let b = RollbackSession(localPlayer: 1, transport: net.endpointB, config: config, seed: seed, inputDelay: scenario.inputDelay)
 
+        var maxWindow = 0
         for f in 0..<scenario.frames {
             a.step(localInput: raw[0][f])
             b.step(localInput: raw[1][f])
             net.advance()
+            // Exchange confirmed-frame checksums each frame, as the live transport
+            // would piggyback them, so a divergence would be caught here too.
+            if let ca = a.localChecksum() { b.ingestPeerChecksum(frame: ca.frame, hash: ca.hash) }
+            if let cb = b.localChecksum() { a.ingestPeerChecksum(frame: cb.frame, hash: cb.hash) }
+            maxWindow = max(maxWindow, a.retainedFrameCount, b.retainedFrameCount)
         }
 
         let ref = reference(raw: raw, frames: scenario.frames, inputDelay: scenario.inputDelay, config: config, seed: seed)
 
         let maxConfirmed = min(a.confirmedFrame, b.confirmedFrame)
+        // Memory is bounded, so only compare frames both sessions still retain.
+        let start = max(a.oldestRetainedFrame, b.oldestRetainedFrame)
         var matched = true
         var firstMismatch: Int? = nil
-        var f = 0
+        var f = start
         while f <= maxConfirmed {
             let h = stateHash(ref[f])
             if stateHash(a.stateAt(frame: f)) != h || stateHash(b.stateAt(frame: f)) != h {
@@ -122,11 +132,13 @@ public enum RollbackHarness {
 
         return Result(
             maxConfirmed: maxConfirmed,
-            framesCompared: maxConfirmed + 1,
+            framesCompared: max(0, maxConfirmed - start + 1),
             matchedReference: matched,
             firstMismatch: firstMismatch,
             rollbacksA: a.rollbackCount,
-            rollbacksB: b.rollbackCount
+            rollbacksB: b.rollbackCount,
+            desyncDetected: a.desyncDetected || b.desyncDetected,
+            maxRetainedWindow: maxWindow
         )
     }
 }

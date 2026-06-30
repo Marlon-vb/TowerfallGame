@@ -6,6 +6,29 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 
 ## [Unreleased]
 
+### Netcode hardening (Phase 10.1) (2026-06-30)
+- `RollbackSession` now bounds memory with a sliding window: frames older than
+  the confirmed frontier (minus a small margin) are evicted, so storage stays
+  flat over long matches instead of growing per frame. Adds `oldestRetainedFrame`
+  / `retainedFrameCount`; `stateAt` is valid within the retained window.
+- Prediction barrier: the tip will not run more than `maxPredictionFrames` ahead
+  of confirmed. When the peer goes quiet the session stalls (and exposes
+  `isStalled`) instead of predicting unboundedly, which also caps the rollback
+  window.
+- Connection health: `framesSinceRemoteInput` + `connectionState`
+  (healthy/unstable/disconnected) with configurable timeouts. The scene shows a
+  "RECONNECTING..." banner while waiting and declares a one-time forfeit win if
+  the peer stays gone past the timeout (`SceneDriver.linkStatus`).
+- Desync detection: `localChecksum()` / `ingestPeerChecksum()` exchange
+  confirmed-frame state hashes; a disagreement trips `desyncDetected` (buffered
+  so it works regardless of which peer is ahead). The harness exchanges these
+  every frame.
+- Tests: long-match bounded-memory + no-false-desync, desync caught on diverging
+  sessions, and stall/disconnect on a silent peer. Mirrored in
+  `ArrowClashSimCheck`. Existing rollback correctness tests still pass within the
+  retained window.
+- Added docs/NETCODE.md.
+
 ### Hand-drawn chibi character art in-game (2026-06-30)
 - Replaced the PixelLab base body with hand-generated chibi poses (ChatGPT image
   creator, from the canonical prompt in docs/CHARACTER_STYLE.md): idle, run (x2),

@@ -80,10 +80,14 @@ composites layered character art so we never pre-bake every combination.
 ## Phase 10 - Netcode & backend hardening  [me]
 
 10.1 Robustness
-- Disconnect/reconnect handling; graceful forfeit/abandon; pause-on-drop.
-- Desync detection via confirmed-frame state-hash exchange + recovery/resync.
-- Ring-buffer the rollback frame storage (cap memory over long matches).
-- Input-delay/latency tuning; jitter buffer; configurable region.
+- [done] Bounded rollback memory (sliding window evicting confirmed frames).
+- [done] Prediction barrier (stall instead of unbounded prediction) + pause-on-
+  drop banner; graceful forfeit when the peer times out.
+- [done] Disconnect detection via connection-health timeouts (connectionState).
+- [done] Desync detection via confirmed-frame state-hash exchange (session API +
+  harness). Remaining: piggyback checksums on the live transport; recovery/resync.
+- Remaining: reconnect/resume the same match; input-delay/latency auto-tuning;
+  jitter buffer; configurable region. See docs/NETCODE.md.
 10.2 Server authority / anti-cheat
 - Validate match results server-side beyond clamping (e.g., server-checked
   match summaries or a server-run/verified sim) so XP/coins can't be forged.
