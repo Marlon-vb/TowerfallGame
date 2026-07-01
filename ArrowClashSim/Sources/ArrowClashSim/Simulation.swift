@@ -449,8 +449,33 @@ public enum Simulation {
     // one) scores. A double kill scores for no one.
 
     private static func resolveDeaths(state: inout GameState, config: GameConfig) {
-        // Arrows.
+        // Dash-catch (TowerFall's signature): a player who is mid-dash and
+        // touches a flying arrow catches it instead of dying - even their own.
+        // Runs before the kill pass so a caught arrow can never kill. The catch
+        // refills the quiver up to the cap; past the cap the arrow is still
+        // swatted dead (you are safe either way). Players checked in index order.
         var a = 0
+        while a < state.arrows.count {
+            if state.arrows[a].active && !state.arrows[a].stuck {
+                var pi = 0
+                while pi < state.players.count {
+                    if state.players[pi].alive
+                        && state.players[pi].dashActiveTimer > 0
+                        && pointInPlayer(state.arrows[a].pos, player: state.players[pi], config: config) {
+                        if state.players[pi].arrows < config.startingArrows {
+                            state.players[pi].arrows += 1
+                        }
+                        state.arrows[a] = .empty
+                        break
+                    }
+                    pi += 1
+                }
+            }
+            a += 1
+        }
+
+        // Arrows.
+        a = 0
         while a < state.arrows.count {
             if state.arrows[a].active && !state.arrows[a].stuck {
                 var pi = 0

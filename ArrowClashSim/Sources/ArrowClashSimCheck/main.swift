@@ -235,6 +235,43 @@ do {
           "player reclaims a stuck arrow walked over")
 }
 
+do {
+    // Dash-catch: mid-dash, a flying enemy arrow is caught (quiver +1, no
+    // death); the identical setup without the dash kills.
+    let map = TileMap.defaultArena()
+    let config = GameConfig.default
+
+    func incoming(_ player: PlayerState) -> ArrowState {
+        let center = FixedVec(
+            x: player.pos.x + config.playerWidth / Fixed(2),
+            y: player.pos.y + config.playerHeight / Fixed(2)
+        )
+        return ArrowState(
+            pos: FixedVec(x: center.x + config.arrowSpeed, y: center.y),
+            vel: FixedVec(x: -config.arrowSpeed, y: .zero),
+            active: true, stuck: false, owner: 1, dir: 128
+        )
+    }
+
+    var caught = GameState.initial(config: config, seed: 1)
+    caught.phase = .playing
+    caught.players[0].arrows = 0
+    caught.arrows[0] = incoming(caught.players[0])
+    caught.players[0].dashActiveTimer = 2
+    Simulation.tick(state: &caught, inputs: neutral, map: map, config: config)
+
+    var killed = GameState.initial(config: config, seed: 1)
+    killed.phase = .playing
+    killed.arrows[0] = incoming(killed.players[0])
+    Simulation.tick(state: &killed, inputs: neutral, map: map, config: config)
+
+    check(caught.players[0].alive
+          && caught.players[0].arrows == 1
+          && caught.arrows.filter { $0.active }.isEmpty
+          && !killed.players[0].alive,
+          "dash catches a flying arrow; the same arrow kills without the dash")
+}
+
 // MARK: - Match flow
 
 print("Match flow")
