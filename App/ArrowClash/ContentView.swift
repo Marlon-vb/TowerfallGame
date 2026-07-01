@@ -18,6 +18,8 @@ struct ContentView: View {
             StoreView(profileService: model.profileService, onClose: { model.openCustomize() })
         case .settings:
             SettingsView(onClose: { model.closeSettings() })
+        case .leaderboard:
+            LeaderboardView(profileService: model.profileService, onClose: { model.backToMenu() })
         case .playing:
             if let scene = model.scene {
                 GameView(scene: scene, model: model)

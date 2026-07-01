@@ -42,6 +42,8 @@ struct MenuView: View {
                         .buttonStyle(MenuButtonStyle(prominent: false))
                     Button("Store") { model.openStore() }
                         .buttonStyle(MenuButtonStyle(prominent: false))
+                    Button("Leaderboard") { model.openLeaderboard() }
+                        .buttonStyle(MenuButtonStyle(prominent: false))
                     Button("Settings") { model.openSettings() }
                         .buttonStyle(MenuButtonStyle(prominent: false))
                     if !model.statusText.isEmpty {

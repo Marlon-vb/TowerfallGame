@@ -91,6 +91,50 @@ final class ProfileService: ObservableObject {
         }
     }
 
+    // MARK: Leaderboard
+
+    struct LeaderboardEntry: Identifiable, Equatable {
+        let id: String
+        let rank: Int
+        let username: String
+        let xp: Int
+    }
+
+    @Published var leaderboard: [LeaderboardEntry] = []
+
+    func refreshLeaderboard(limit: Int = 25) async {
+        do {
+            let token = try await ensureToken()
+            guard let url = URL(string: "\(baseURL)/v2/leaderboard/arrowclash_xp?limit=\(limit)") else {
+                throw NakamaHTTPError.badServerHost
+            }
+            var req = URLRequest(url: url)
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            let (data, response) = try await URLSession.shared.data(for: req)
+            try Self.checkOK(response, data)
+            let decoded = try JSONDecoder().decode(LeaderboardResponse.self, from: data)
+            leaderboard = (decoded.records ?? []).map { record in
+                LeaderboardEntry(id: record.owner_id ?? UUID().uuidString,
+                                 rank: Int(record.rank ?? "0") ?? 0,
+                                 username: (record.username?.isEmpty == false ? record.username! : "archer"),
+                                 xp: Int(record.score ?? "0") ?? 0)
+            }
+        } catch {
+            statusText = "\(error)"
+        }
+    }
+
+    // Nakama's protobuf-JSON encodes int64 fields as strings.
+    private struct LeaderboardResponse: Decodable {
+        let records: [LeaderboardRecord]?
+    }
+    private struct LeaderboardRecord: Decodable {
+        let owner_id: String?
+        let username: String?
+        let score: String?
+        let rank: String?
+    }
+
     // MARK: HTTP plumbing
 
     private func ensureToken() async throws -> String {

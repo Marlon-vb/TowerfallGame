@@ -14,6 +14,7 @@ final class AppModel: ObservableObject {
         case customize
         case store
         case settings
+        case leaderboard
         case searching
         case playing
     }
@@ -100,6 +101,11 @@ final class AppModel: ObservableObject {
 
     func openSettings() {
         screen = .settings
+    }
+
+    func openLeaderboard() {
+        profileService.serverHost = Settings.serverHost
+        screen = .leaderboard
     }
 
     func closeSettings() {
