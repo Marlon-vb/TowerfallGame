@@ -97,6 +97,61 @@ final class SpecialArrowsTests: XCTestCase {
         }
     }
 
+    func testLaserRicochetsOffTilesInsteadOfSticking() {
+        var state = playingState()
+        // Fire a laser straight down at the floor: it must bounce back up
+        // (vy flips negative) and never stick.
+        state.arrows[0] = ArrowState(
+            pos: FixedVec(x: Fixed(24), y: Fixed(170)),
+            vel: FixedVec(x: .zero, y: config.laserSpeed),
+            active: true, stuck: false, owner: 0, dir: 64,
+            kind: ArrowKind.laser.rawValue
+        )
+        var bounced = false
+        for _ in 0..<10 {
+            Simulation.tick(state: &state, inputs: neutral(), map: map, config: config)
+            XCTAssertFalse(state.arrows[0].stuck, "laser must never stick")
+            if state.arrows[0].vel.y.raw < 0 { bounced = true }
+        }
+        XCTAssertTrue(bounced, "laser must reflect off the floor")
+        XCTAssertTrue(state.arrows[0].active, "laser keeps flying after the bounce")
+    }
+
+    func testLaserHitsItsOwnerAfterGraceWindow() {
+        var state = playingState()
+        // A laser sitting on the shooter's own position: harmless inside the
+        // grace window, lethal afterwards.
+        let center = FixedVec(
+            x: state.players[0].pos.x + config.playerWidth / Fixed(2),
+            y: state.players[0].pos.y + config.playerHeight / Fixed(2)
+        )
+        state.arrows[0] = ArrowState(
+            pos: FixedVec(x: center.x - config.laserSpeed, y: center.y),
+            vel: FixedVec(x: config.laserSpeed, y: .zero),
+            active: true, stuck: false, owner: 0, dir: 0,
+            kind: ArrowKind.laser.rawValue,
+            life: config.laserGraceTicks + 1
+        )
+        Simulation.tick(state: &state, inputs: neutral(), map: map, config: config)
+        XCTAssertFalse(state.players[0].alive, "a ricocheting laser is dangerous to its shooter")
+    }
+
+    func testLaserExpiresAfterLifetime() {
+        var state = playingState()
+        state.arrows[0] = ArrowState(
+            pos: FixedVec(x: Fixed(24), y: Fixed(150)),
+            vel: FixedVec(x: config.laserSpeed, y: .zero),
+            active: true, stuck: false, owner: 0, dir: 0,
+            kind: ArrowKind.laser.rawValue,
+            life: config.laserLifeTicks
+        )
+        // Move the shooter out of the corridor so the expiry (not a kill)
+        // is what removes it.
+        state.players[0].pos = FixedVec(x: Fixed(24), y: Fixed(40))
+        Simulation.tick(state: &state, inputs: neutral(), map: map, config: config)
+        XCTAssertFalse(state.arrows[0].active, "laser expires at its lifetime")
+    }
+
     func testDrillPassesThroughTiles() {
         var state = playingState()
         // Fire a drill straight down at the floor under the spawn: a normal

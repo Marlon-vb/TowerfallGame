@@ -43,6 +43,13 @@ struct CustomizeView: View {
                     }
                 }
 
+                if !profileService.statusText.isEmpty {
+                    Text(profileService.statusText)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.orange)
+                        .lineLimit(1)
+                }
+
                 HStack(spacing: 12) {
                     Button("Store") { onStore() }
                         .buttonStyle(PixelButtonStyle(prominent: true, compact: true))

@@ -61,6 +61,8 @@ public struct GameConfig: Equatable {
     public var featherSpeed: Fixed      // slow straight flier that wraps
     public var drillLifeTicks: Int32    // drill flight time before it expires
     public var featherLifeTicks: Int32  // feather flight time before it expires
+    public var laserLifeTicks: Int32    // ricocheting laser flight time before it expires
+    public var laserGraceTicks: Int32   // after this, a laser can hit its own shooter
 
     // Match flow (Phase 4).
     public var countdownTicks: Int32    // freeze before a round begins
@@ -106,6 +108,8 @@ public struct GameConfig: Equatable {
         featherSpeed: Fixed = Fixed(4),
         drillLifeTicks: Int32 = 75,                              // ~1.6 screen widths
         featherLifeTicks: Int32 = 240,                           // ~3 screen crossings
+        laserLifeTicks: Int32 = 480,                             // ~8s of ricochets
+        laserGraceTicks: Int32 = 20,                             // ~0.33s owner immunity
         countdownTicks: Int32 = 90,                              // ~1.5s
         roundOverTicks: Int32 = 120,                             // ~2.0s
         roundsToWin: Int = 3,                                    // best of 5
@@ -145,6 +149,8 @@ public struct GameConfig: Equatable {
         self.featherSpeed = featherSpeed
         self.drillLifeTicks = drillLifeTicks
         self.featherLifeTicks = featherLifeTicks
+        self.laserLifeTicks = laserLifeTicks
+        self.laserGraceTicks = laserGraceTicks
         self.countdownTicks = countdownTicks
         self.roundOverTicks = roundOverTicks
         self.roundsToWin = roundsToWin

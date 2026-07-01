@@ -510,6 +510,10 @@ public enum Simulation {
             arrow = .empty
             return
         }
+        if kind == .laser && arrow.life > config.laserLifeTicks {
+            arrow = .empty
+            return
+        }
 
         // Gravity (light arc) - only ballistic kinds; laser/drill/feather fly
         // perfectly straight.
@@ -521,21 +525,45 @@ public enum Simulation {
         }
 
         let previous = arrow.pos
-        arrow.pos = FixedVec(x: arrow.pos.x + arrow.vel.x, y: arrow.pos.y + arrow.vel.y)
 
-        // Point collision: if the new position is inside a solid tile, stick at
-        // the pre-move position so the arrow rests against the surface. Valid
-        // while arrow speed stays below tileSize (see GameConfig). Drills pass
-        // straight through tiles; bombs "stick" for exactly the caller's tick
-        // (the caller detonates and removes them immediately).
-        if kind != .drill {
-            let col = TileMap.tileIndex(arrow.pos.x, tileSize: config.tileSize)
-            let row = TileMap.tileIndex(arrow.pos.y, tileSize: config.tileSize)
-            if map.isSolid(col: col, row: row) {
-                arrow.pos = previous
-                arrow.vel = .zero
-                arrow.stuck = true
-                return
+        // Lasers RICOCHET off tiles instead of sticking: reflect the velocity
+        // component(s) whose axis caused the hit and stay at the pre-move
+        // position for this tick. They keep bouncing until they hit a player
+        // or their lifetime runs out.
+        if kind == .laser {
+            let nextX = FixedVec(x: arrow.pos.x + arrow.vel.x, y: arrow.pos.y)
+            let nextY = FixedVec(x: arrow.pos.x, y: arrow.pos.y + arrow.vel.y)
+            let next = FixedVec(x: arrow.pos.x + arrow.vel.x, y: arrow.pos.y + arrow.vel.y)
+            if solidAt(next, map: map, config: config) {
+                let hitX = solidAt(nextX, map: map, config: config)
+                let hitY = solidAt(nextY, map: map, config: config)
+                // Mirror the render direction with pure integer math:
+                // x-flip: dir' = 128 - dir, y-flip: dir' = -dir (mod 256).
+                if hitX { arrow.vel.x = Fixed(raw: -arrow.vel.x.raw); arrow.dir = 128 &- arrow.dir }
+                if hitY { arrow.vel.y = Fixed(raw: -arrow.vel.y.raw); arrow.dir = 0 &- arrow.dir }
+                if !hitX && !hitY { // exact corner: reflect both
+                    arrow.vel.x = Fixed(raw: -arrow.vel.x.raw)
+                    arrow.vel.y = Fixed(raw: -arrow.vel.y.raw)
+                    arrow.dir = arrow.dir &+ 128
+                }
+                return // stay at the pre-move position this tick
+            }
+            arrow.pos = next
+        } else {
+            arrow.pos = FixedVec(x: arrow.pos.x + arrow.vel.x, y: arrow.pos.y + arrow.vel.y)
+
+            // Point collision: if the new position is inside a solid tile,
+            // stick at the pre-move position so the arrow rests against the
+            // surface. Valid while arrow speed stays below tileSize (see
+            // GameConfig). Drills pass straight through tiles; bombs "stick"
+            // for exactly the caller's tick (the caller detonates them).
+            if kind != .drill {
+                if solidAt(arrow.pos, map: map, config: config) {
+                    arrow.pos = previous
+                    arrow.vel = .zero
+                    arrow.stuck = true
+                    return
+                }
             }
         }
 
@@ -546,6 +574,12 @@ public enum Simulation {
         else if arrow.pos.x.raw >= worldW.raw { arrow.pos.x -= worldW }
         if arrow.pos.y.raw < 0 { arrow.pos.y += worldH }
         else if arrow.pos.y.raw >= worldH.raw { arrow.pos.y -= worldH }
+    }
+
+    private static func solidAt(_ point: FixedVec, map: TileMap, config: GameConfig) -> Bool {
+        let col = TileMap.tileIndex(point.x, tileSize: config.tileSize)
+        let row = TileMap.tileIndex(point.y, tileSize: config.tileSize)
+        return map.isSolid(col: col, row: row)
     }
 
     private static func pointInPlayer(_ point: FixedVec, player p: PlayerState, config: GameConfig) -> Bool {
@@ -591,13 +625,17 @@ public enum Simulation {
         }
 
         // Arrows. A direct bomb hit also detonates its splash (owner included).
+        // Ricocheting lasers become dangerous to their OWN shooter after a
+        // short grace window - a bouncing beam owns the room.
         a = 0
         while a < state.arrows.count {
             if state.arrows[a].active && !state.arrows[a].stuck {
+                let laserFriendlyFire = state.arrows[a].arrowKind == .laser
+                    && state.arrows[a].life > config.laserGraceTicks
                 var pi = 0
                 while pi < state.players.count {
                     if state.players[pi].alive
-                        && Int8(pi) != state.arrows[a].owner
+                        && (Int8(pi) != state.arrows[a].owner || laserFriendlyFire)
                         && pointInPlayer(state.arrows[a].pos, player: state.players[pi], config: config) {
                         state.players[pi].alive = false
                         if state.arrows[a].arrowKind == .bomb {

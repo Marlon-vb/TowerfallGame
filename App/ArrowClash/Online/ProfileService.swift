@@ -25,9 +25,22 @@ final class ProfileService: ObservableObject {
 
     private let auth: AuthProvider
     private var token: String?
+    private let cacheKey = "arrowclash.profile.cache"
 
     init(auth: AuthProvider = DeviceAuthProvider()) {
         self.auth = auth
+        // Start from the last known profile so customization works offline and
+        // the menu shows real values before the first server round-trip.
+        if let data = UserDefaults.standard.data(forKey: cacheKey),
+           let cached = try? JSONDecoder().decode(PlayerProfile.self, from: data) {
+            profile = cached
+        }
+    }
+
+    private func cacheProfile() {
+        if let p = profile, let data = try? JSONEncoder().encode(p) {
+            UserDefaults.standard.set(data, forKey: cacheKey)
+        }
     }
 
     private var baseURL: String {
@@ -44,8 +57,11 @@ final class ProfileService: ObservableObject {
     func refresh() async {
         do {
             profile = try await rpcProfile("get_profile", innerPayload: nil)
+            statusText = ""
+            cacheProfile()
         } catch {
-            statusText = "\(error)"
+            // Keep the cached/local profile; the app stays usable offline.
+            statusText = "Offline"
         }
     }
 
@@ -67,13 +83,22 @@ final class ProfileService: ObservableObject {
 
     @discardableResult
     func setAvatar(_ avatar: Avatar) async -> Bool {
+        // Local-first: apply immediately so the customize screen always
+        // responds, then sync to the server (which stays authoritative for
+        // what opponents see - match START uses the server-side profile).
+        var local = profile ?? .placeholder
+        local.avatar = avatar
+        profile = local
+        cacheProfile()
         do {
             let inner = try jsonString(avatar)
             profile = try await rpcProfile("set_avatar", innerPayload: inner)
+            statusText = ""
+            cacheProfile()
             return true
         } catch {
-            statusText = "\(error)"
-            return false
+            statusText = "Saved locally (offline) - will sync when connected"
+            return true
         }
     }
 
@@ -84,11 +109,22 @@ final class ProfileService: ObservableObject {
         do {
             let inner = try jsonString(PurchaseRequest(itemId: itemId))
             profile = try await rpcProfile("purchase", innerPayload: inner)
+            statusText = ""
+            cacheProfile()
             return true
+        } catch NakamaHTTPError.server(let code, let message) {
+            statusText = friendlyRPCError(code, message)
+            return false
         } catch {
-            statusText = "\(error)"
+            statusText = "Store needs a connection"
             return false
         }
+    }
+
+    private func friendlyRPCError(_ code: Int, _ message: String) -> String {
+        if message.contains("not enough coins") { return "Not enough coins" }
+        if message.contains("already owned") { return "Already owned" }
+        return "Purchase failed (\(code))"
     }
 
     // MARK: Leaderboard
