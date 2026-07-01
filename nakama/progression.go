@@ -23,15 +23,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math"
 
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
 
 const (
-	profileCollection = "profile"
-	profileKey        = "main"
-	leaderboardID     = "arrowclash_xp"
+	profileCollection   = "profile"
+	profileKey          = "main"
+	leaderboardID       = "arrowclash_xp"
+	ratingLeaderboardID = "arrowclash_rating"
 
 	matchRecordCollection = "matches"
 	matchClaimCollection  = "match_claims"
@@ -72,6 +74,10 @@ func loadProfileVersioned(ctx context.Context, nk runtime.NakamaModule, userID s
 	// Profiles stored before the bow slot existed get the default bow.
 	if profile.Avatar.Bow == "" {
 		profile.Avatar.Bow = "bow_wood"
+	}
+	// Profiles stored before ranked existed get the base rating.
+	if profile.Rating <= 0 {
+		profile.Rating = baseRating
 	}
 	return profile, objects[0].Version, nil
 }
@@ -253,10 +259,24 @@ func rpcMatchEnd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		won = false
 	}
 
+	// Ranked ELO: the opponent is the other participant of the match record.
+	// Their current rating is read once here (read-only); the caller's own
+	// rating is taken inside the OCC mutate so retries stay correct.
+	opponentRating := baseRating
+	for _, uid := range record.Order {
+		if uid != userID {
+			if opp, err := loadProfile(ctx, nk, uid); err == nil {
+				opponentRating = opp.Rating
+			}
+			break
+		}
+	}
+
 	profile, err := updateProfile(ctx, nk, userID, func(p *Profile) error {
 		p.XP += xpForMatch(won, req.Kills)
 		p.Coins += coinsForMatch(won, req.Kills)
 		p.Level = levelForXP(p.XP)
+		p.Rating = eloUpdate(p.Rating, opponentRating, won)
 		return nil
 	})
 	if err != nil {
@@ -267,8 +287,26 @@ func rpcMatchEnd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if _, err := nk.LeaderboardRecordWrite(ctx, leaderboardID, userID, username, int64(profile.XP), 0, nil, nil); err != nil {
 		logger.Warn("leaderboard write failed: %v", err)
 	}
+	if _, err := nk.LeaderboardRecordWrite(ctx, ratingLeaderboardID, userID, username, int64(profile.Rating), 0, nil, nil); err != nil {
+		logger.Warn("rating leaderboard write failed: %v", err)
+	}
 
 	return marshalProfile(profile)
+}
+
+// Standard ELO with K=32, floored so new players cannot dig a bottomless hole.
+func eloUpdate(rating, opponent int, won bool) int {
+	const k = 32.0
+	expected := 1.0 / (1.0 + math.Pow(10, float64(opponent-rating)/400.0))
+	score := 0.0
+	if won {
+		score = 1.0
+	}
+	next := rating + int(math.Round(k*(score-expected)))
+	if next < minRating {
+		next = minRating
+	}
+	return next
 }
 
 func rpcGetProfile(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {

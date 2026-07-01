@@ -10,38 +10,46 @@ struct LeaderboardView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.06, green: 0.07, blue: 0.10).ignoresSafeArea()
+            PixelBackground(name: "menu", scrim: 0.6)
             ScreenScaffold {
               VStack(spacing: 12) {
-                Text("Leaderboard")
-                    .font(.system(size: 26, weight: .heavy))
+                Text("RANKED LADDER")
+                    .font(.system(size: 22, weight: .heavy, design: .monospaced))
                     .foregroundColor(.white)
 
                 if profileService.leaderboard.isEmpty {
-                    Text("No matches played yet - be the first!")
-                        .font(.subheadline)
+                    Text("No ranked matches yet - be the first!")
+                        .font(.system(size: 13, design: .monospaced))
                         .foregroundColor(.white.opacity(0.6))
                         .padding(.vertical, 24)
                 } else {
                     VStack(spacing: 6) {
                         ForEach(profileService.leaderboard) { entry in
-                            HStack(spacing: 12) {
+                            let tier = RankTier.tier(for: entry.score)
+                            HStack(spacing: 10) {
                                 Text("#\(entry.rank)")
-                                    .font(.system(size: 15, weight: .heavy, design: .monospaced))
+                                    .font(.system(size: 14, weight: .heavy, design: .monospaced))
                                     .foregroundColor(rankColor(entry.rank))
-                                    .frame(width: 44, alignment: .leading)
+                                    .frame(width: 40, alignment: .leading)
+                                Text(tier.name.uppercased())
+                                    .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                                    .foregroundColor(.black.opacity(0.8))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color(uiColor: tier.color))
+                                    .cornerRadius(3)
                                 Text(entry.username)
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
                                     .foregroundColor(.white)
                                     .lineLimit(1)
                                 Spacer()
-                                Text("\(entry.xp) XP")
-                                    .font(.system(size: 14, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.white.opacity(0.75))
+                                Text("\(entry.score)")
+                                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.85))
                             }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 9)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.35)))
                         }
                     }
                 }
@@ -51,7 +59,7 @@ struct LeaderboardView: View {
                 }
 
                 Button("Back") { onClose() }
-                    .buttonStyle(SmallButtonStyle(prominent: false))
+                    .buttonStyle(PixelButtonStyle(prominent: false, compact: true))
                     .padding(.top, 6)
               }
             }

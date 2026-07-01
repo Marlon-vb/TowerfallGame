@@ -918,10 +918,64 @@ def generate_characters_and_bows():
     print(f"characters: {n} frames across {len(CHAR_LAYERS) + len(BOW_LAYERS)} layers")
 
 
+
+
+# ---------------------------------------------------------------------------
+# Menu background: a wide hero scene for the main menu (16-bit, no text)
+# ---------------------------------------------------------------------------
+
+def generate_menu_bg():
+    c = Canvas(480, 270)
+    vgrad(c, [(24, 20, 52), (44, 32, 78), (90, 54, 96), (168, 100, 96)])
+    # Stars in the upper half.
+    for i in range(120):
+        x, y = hash2(i, 21) % c.w, hash2(i, 22) % (c.h // 2)
+        c.put(x, y, (232, 230, 244, 255) if i % 3 else (160, 158, 196, 255))
+    # Big moon.
+    mx, my, mr = 396, 52, 22
+    for y in range(-mr, mr + 1):
+        for x in range(-mr, mr + 1):
+            d = x * x + y * y
+            if d <= mr * mr:
+                col = (240, 234, 210, 255) if d < (mr - 3) * (mr - 3) else (214, 206, 180, 255)
+                c.put(mx + x, my + y, col)
+    for cx, cy in ((388, 46), (404, 60), (396, 40)):
+        c.put(cx, cy, (214, 206, 180, 255))
+    # Distant castle skyline.
+    sil = (30, 24, 48, 255)
+    def tower(x0, w, top):
+        for x in range(x0, x0 + w):
+            for y in range(top, c.h):
+                c.put(x, y, sil)
+        for x in range(x0 - 1, x0 + w + 1, 2):
+            c.put(x, top - 1, sil); c.put(x, top - 2, sil)
+    tower(40, 22, 150); tower(110, 16, 176); tower(200, 30, 140)
+    tower(300, 16, 172); tower(420, 22, 156)
+    for x in range(20, 460):
+        for y in range(200, c.h):
+            c.put(x, y, sil)
+    for wx, wy in ((48, 168), (208, 152), (214, 178), (306, 184), (428, 170), (120, 188)):
+        c.put(wx, wy, (240, 200, 90, 255)); c.put(wx, wy + 1, (240, 200, 90, 255))
+    # Foreground battlement ledge along the bottom.
+    ledge = (58, 50, 84, 255)
+    ledge_hi = (86, 76, 118, 255)
+    for x in range(c.w):
+        for y in range(c.h - 26, c.h):
+            c.put(x, y, ledge)
+        c.put(x, c.h - 26, ledge_hi)
+    for x in range(0, c.w, 12):
+        for xx in range(x, min(x + 6, c.w)):
+            c.put(xx, c.h - 28, ledge)
+            c.put(xx, c.h - 27, ledge_hi)
+    c.save(SPRITES / "backgrounds" / "menu.png")
+    print("menu background")
+
+
 if __name__ == "__main__":
     generate_characters_and_bows()
     generate_worlds()
     generate_fx()
+    generate_menu_bg()
     import sys
     if len(sys.argv) > 1:
         contact_sheet(Path(sys.argv[1]))

@@ -97,15 +97,16 @@ final class ProfileService: ObservableObject {
         let id: String
         let rank: Int
         let username: String
-        let xp: Int
+        let score: Int
     }
 
     @Published var leaderboard: [LeaderboardEntry] = []
 
+    // The ranked ladder (ELO ratings, server-written only).
     func refreshLeaderboard(limit: Int = 25) async {
         do {
             let token = try await ensureToken()
-            guard let url = URL(string: "\(baseURL)/v2/leaderboard/arrowclash_xp?limit=\(limit)") else {
+            guard let url = URL(string: "\(baseURL)/v2/leaderboard/arrowclash_rating?limit=\(limit)") else {
                 throw NakamaHTTPError.badServerHost
             }
             var req = URLRequest(url: url)
@@ -117,7 +118,7 @@ final class ProfileService: ObservableObject {
                 LeaderboardEntry(id: record.owner_id ?? UUID().uuidString,
                                  rank: Int(record.rank ?? "0") ?? 0,
                                  username: (record.username?.isEmpty == false ? record.username! : "archer"),
-                                 xp: Int(record.score ?? "0") ?? 0)
+                                 score: Int(record.score ?? "0") ?? 0)
             }
         } catch {
             statusText = "\(error)"

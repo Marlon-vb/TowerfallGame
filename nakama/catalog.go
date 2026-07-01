@@ -108,10 +108,14 @@ type Profile struct {
 	Coins  int      `json:"coins"`
 	Owned  []string `json:"owned"` // purchased item ids (free items are implicitly owned)
 	Avatar Avatar   `json:"avatar"`
+	Rating int      `json:"rating"` // ranked ELO; starts at baseRating
 }
 
+const baseRating = 1000
+const minRating = 100
+
 func defaultProfile() Profile {
-	return Profile{XP: 0, Level: 1, Coins: 0, Owned: []string{}, Avatar: defaultAvatar()}
+	return Profile{XP: 0, Level: 1, Coins: 0, Owned: []string{}, Avatar: defaultAvatar(), Rating: baseRating}
 }
 
 func ownsItem(profile Profile, id string) bool {

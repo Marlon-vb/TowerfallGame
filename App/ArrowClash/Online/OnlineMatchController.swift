@@ -98,10 +98,20 @@ final class OnlineMatchController {
         }
     }
 
+    // The caller's current ELO rating; matchmaking pairs players inside a
+    // mutual +-300 band around it (bands are symmetric, so both sides agree).
+    var myRating: Int = 1000
+
     private func enterMatchmaking() async {
         do {
             onStatus?("Finding opponent...")
-            _ = try await socket?.addMatchmaker(query: "*", minCount: 2, maxCount: 2, stringProperties: nil, numericProperties: nil, countMultiple: nil)
+            let lo = myRating - 300
+            let hi = myRating + 300
+            let query = "+properties.rating:>=\(lo) +properties.rating:<=\(hi)"
+            _ = try await socket?.addMatchmaker(query: query, minCount: 2, maxCount: 2,
+                                                stringProperties: nil,
+                                                numericProperties: ["rating": Double(myRating)],
+                                                countMultiple: nil)
         } catch {
             onError?("\(error)")
         }

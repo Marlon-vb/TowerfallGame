@@ -52,9 +52,12 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return err
 	}
 
-	// XP leaderboard (authoritative: only the server runtime writes it).
+	// Leaderboards (authoritative: only the server runtime writes them).
 	if err := nk.LeaderboardCreate(ctx, leaderboardID, true, "desc", "set", "", nil); err != nil {
 		logger.Warn("leaderboard create (may already exist): %v", err)
+	}
+	if err := nk.LeaderboardCreate(ctx, ratingLeaderboardID, true, "desc", "set", "", nil); err != nil {
+		logger.Warn("rating leaderboard create (may already exist): %v", err)
 	}
 
 	logger.Info("arrowclash module loaded")

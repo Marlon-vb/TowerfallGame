@@ -57,6 +57,7 @@ final class AppModel: ObservableObject {
 
         let controller = OnlineMatchController()
         controller.serverHost = Settings.serverHost
+        controller.myRating = profileService.profile?.rating ?? 1000
         self.controller = controller
 
         controller.onStatus = { [weak self] text in

@@ -6,6 +6,33 @@ Format loosely follows Keep a Changelog. Dates are when the work landed on the
 
 ## [Unreleased]
 
+### TowerFall arsenal, 16-bit worlds, ranked ladder (2026-07-01)
+- Gameplay: four special arrow types - BOMB (splash-kills everyone in radius,
+  owner included), LASER (fast, dead straight), DRILL (flies through walls),
+  FEATHER (slow screen-wrapper). A treasure chest spawns mid-round at a
+  contested map spot; first to touch it gets 2 specials. Specials fire first,
+  can be dash-caught, and refill from stuck special arrows. All deterministic,
+  hashed, rollback-safe, with a dedicated test suite.
+- Maps: all 10 arenas redesigned TowerFall-style (grounded floors, side
+  structures, wrap gaps) with validated spawns/chest spots, across five worlds:
+  alien, castle, lava, sludge, aquatic (tools/generate_maps.py).
+- Art: full 16-bit backgrounds per world (starfields/ufo, castle dusk
+  silhouettes, lava lakes, industrial vats, reef with light rays) + themed
+  tilesets (bricks, embers, slime, alien grass, sand). Characters ~25% smaller
+  in-world with extra detail. Per-kind arrow sprites, chest sprite, bomb
+  explosion FX, special-stash HUD.
+- Store: 9 limited fun heads (fish head, pet crow, TV head, frog hood, cat
+  ears, wizard/pirate hats, viking helm, ninja band) + new BOW cosmetic slot
+  (wood/silver/gold/crystal, visible while shooting). Client+server catalogs,
+  backward-compatible profiles.
+- Ranked: server-side ELO (K=32, floor 100) updated in match_end against the
+  verified opponent, arrowclash_rating leaderboard, tier system
+  (Bronze/Silver/Gold/Diamond/Champion), and rating-band matchmaking (+-300).
+- UI: one-page 16-bit main menu over a generated castle-night backdrop with
+  rank badge + chunky pixel buttons; customize screen redesigned around a big
+  live preview with left/right arrows per slot; ranked ladder screen with tier
+  chips; store/settings restyled to match.
+
 ### Chibi pixel style + TowerFall dash-catch + security hardening (2026-07-01)
 - Gameplay: dash-catch - dashing through a flying arrow catches it into the
   quiver (up to cap) instead of dying, even your own; the signature TowerFall

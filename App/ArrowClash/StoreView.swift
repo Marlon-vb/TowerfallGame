@@ -15,7 +15,7 @@ struct StoreView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.06, green: 0.07, blue: 0.10).ignoresSafeArea()
+            PixelBackground(name: "menu", scrim: 0.6)
             ScreenScaffold(maxContentWidth: 560) {
               VStack(spacing: 12) {
                 HStack {

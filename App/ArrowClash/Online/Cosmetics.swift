@@ -51,7 +51,63 @@ struct PlayerProfile: Codable, Equatable {
     var coins: Int
     var owned: [String]
     var avatar: Avatar
-    static let placeholder = PlayerProfile(xp: 0, level: 1, coins: 0, owned: [], avatar: .default)
+    var rating: Int
+    static let placeholder = PlayerProfile(xp: 0, level: 1, coins: 0, owned: [], avatar: .default, rating: 1000)
+
+    init(xp: Int, level: Int, coins: Int, owned: [String], avatar: Avatar, rating: Int) {
+        self.xp = xp
+        self.level = level
+        self.coins = coins
+        self.owned = owned
+        self.avatar = avatar
+        self.rating = rating
+    }
+
+    // Profiles from servers predating ranked decode with the base rating.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        xp = try c.decodeIfPresent(Int.self, forKey: .xp) ?? 0
+        level = try c.decodeIfPresent(Int.self, forKey: .level) ?? 1
+        coins = try c.decodeIfPresent(Int.self, forKey: .coins) ?? 0
+        owned = try c.decodeIfPresent([String].self, forKey: .owned) ?? []
+        avatar = try c.decodeIfPresent(Avatar.self, forKey: .avatar) ?? .default
+        rating = try c.decodeIfPresent(Int.self, forKey: .rating) ?? 1000
+    }
+}
+
+// Ranked tiers derived from the ELO rating.
+enum RankTier: CaseIterable {
+    case bronze, silver, gold, diamond, champion
+
+    static func tier(for rating: Int) -> RankTier {
+        switch rating {
+        case ..<1100: return .bronze
+        case ..<1300: return .silver
+        case ..<1500: return .gold
+        case ..<1800: return .diamond
+        default: return .champion
+        }
+    }
+
+    var name: String {
+        switch self {
+        case .bronze: return "Bronze"
+        case .silver: return "Silver"
+        case .gold: return "Gold"
+        case .diamond: return "Diamond"
+        case .champion: return "Champion"
+        }
+    }
+
+    var color: UIColor {
+        switch self {
+        case .bronze: return UIColor(red: 0.75, green: 0.52, blue: 0.30, alpha: 1)
+        case .silver: return UIColor(red: 0.78, green: 0.80, blue: 0.86, alpha: 1)
+        case .gold: return UIColor(red: 0.98, green: 0.82, blue: 0.25, alpha: 1)
+        case .diamond: return UIColor(red: 0.55, green: 0.85, blue: 0.98, alpha: 1)
+        case .champion: return UIColor(red: 0.90, green: 0.45, blue: 0.90, alpha: 1)
+        }
+    }
 }
 
 enum AccessoryStyle {
