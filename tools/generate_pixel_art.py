@@ -133,18 +133,16 @@ def head_box(p):
 
 
 def draw_head_shape(c, x0, y0, x1, y1, fill, shade):
-    """Rounded head block with bottom/left shading."""
+    """Rounded head block, 3-tone: base + top-right highlight + bottom-left shade.
+    (Style notes from the strong CC0 packs: one light source, soft interior.)"""
     c.rect(x0, y0, x1, y1, fill)
-    # Round the corners (cut 2px steps).
+    # Rounder corners: 2-step cuts.
     for cx, cy in ((x0, y0), (x1, y0), (x0, y1), (x1, y1)):
         c.put(cx, cy, (0, 0, 0, 0))
     for cx, cy in ((x0 + 1, y0), (x0, y0 + 1), (x1 - 1, y0), (x1, y0 + 1),
                    (x0 + 1, y1), (x0, y1 - 1), (x1 - 1, y1), (x1, y1 - 1)):
-        c.put(cx, cy, (0, 0, 0, 0)) if False else None
-    # Softer round: clear one more pixel next to each corner on top.
-    for cx, cy in ((x0 + 1, y0), (x1 - 1, y0)):
-        c.put(cx, cy, fill)  # keep top edge full apart from the corner cut
-    # Shade: bottom row + left column.
+        pass  # keep the 1-step cut only; 2-step looked too diamond-like at 13px
+    # Shade: bottom row + left column (light from the top-right).
     for x in range(x0 + 1, x1):
         c.put(x, y1, shade)
     for y in range(y0 + 2, y1):
@@ -156,24 +154,27 @@ def draw_skin(c, p):
     hx0, hy0, hx1, hy1 = head_box(p)
     draw_head_shape(c, hx0, hy0, hx1, hy1, gray(G_BASE), gray(G_SHADE))
 
-    # Top-light highlight band across the crown (extra 16-bit read).
-    for x in range(hx0 + 3, hx1 - 1):
+    # Top-right highlight arc across the crown (one light source).
+    for x in range(hx0 + 4, hx1):
         c.put(x, hy0 + 1, gray(G_LIGHT))
+    c.put(hx1 - 1, hy0 + 2, gray(G_LIGHT))
 
     # Ear nub on the left (back of head, since we face right).
     c.rect(hx0 - 1, hy0 + 5, hx0 - 1, hy0 + 6, gray(G_SHADE))
 
-    # Face: two eyes shifted toward facing (right), with a glint pixel.
+    # Face: two 2x2 eyes shifted toward facing (right), each with a white
+    # sparkle, plus warm blush marks under them (cute-pack staples).
     if "dead_eyes" in p["flags"]:
-        for ex in (hx0 + 5, hx1 - 3):
+        for ex in (hx0 + 4, hx1 - 4):
             ey = hy0 + 5
             c.put(ex, ey, EYE); c.put(ex + 1, ey + 1, EYE)
             c.put(ex + 1, ey, EYE); c.put(ex, ey + 1, EYE)
     else:
-        for ex in (hx0 + 5, hx1 - 3):
-            c.rect(ex, hy0 + 5, ex, hy0 + 6, EYE)
-            c.put(ex, hy0 + 5, (232, 230, 240, 255))  # glint
-    # Tiny mouth line only on die (shock); none otherwise (ref style).
+        for ex in (hx0 + 4, hx1 - 4):
+            c.rect(ex, hy0 + 5, ex + 1, hy0 + 6, EYE)
+            c.put(ex, hy0 + 5, (236, 234, 244, 255))       # sparkle
+            c.put(ex, hy0 + 8, (222, 138, 128, 255))       # blush
+            c.put(ex + 1, hy0 + 8, (222, 138, 128, 255))
 
     bdx, bdy = p["body"]
 
@@ -241,16 +242,23 @@ BOW_LAYERS = {
 def draw_hair(c, p):
     """Fringe + little top tuft over the head. Grayscale, tinted by hair color."""
     hx0, hy0, hx1, hy1 = head_box(p)
-    # Cap of hair over the top of the head.
+    # Cap of hair over the top of the head, highlight along the crown.
     c.rect(hx0, hy0, hx1, hy0 + 2, gray(G_BASE))
     c.rect(hx0 + 1, hy0 - 1, hx1 - 1, hy0 - 1, gray(G_BASE))
-    # Fringe dips on the forehead (facing-right side gets the longer bang).
+    for x in range(hx0 + 4, hx1 - 1):
+        c.put(x, hy0 - 1, gray(G_LIGHT))
+    # Fringe dips on the forehead (facing-right side gets the longer bang),
+    # with a shade line where hair meets skin so the fringe reads as depth.
     c.rect(hx1 - 2, hy0 + 3, hx1 - 1, hy0 + 3, gray(G_BASE))
     c.rect(hx0 + 2, hy0 + 3, hx0 + 3, hy0 + 3, gray(G_BASE))
+    for x in range(hx0, hx1 + 1):
+        if c.get(x, hy0 + 2)[3] != 0 and c.get(x, hy0 + 3)[3] == 0:
+            c.put(x, hy0 + 2, gray(G_SHADE))
     # Back-of-head mass (left side, since we face right).
     c.rect(hx0, hy0 + 3, hx0 + 1, hy0 + 6, gray(G_SHADE))
     # Tuft.
     c.rect(hx0 + 6, hy0 - 2, hx0 + 7, hy0 - 2, gray(G_BASE))
+    c.put(hx0 + 7, hy0 - 3, gray(G_BASE))
     c.outline()
 
 
@@ -790,6 +798,7 @@ def generate_worlds():
         generate_tileset(name, t)
         c = Canvas(BG_W, BG_H)
         BG_DRAWERS[name](c, t)
+        BG_DECORATORS[name](c)
         c.save(SPRITES / "backgrounds" / f"{name}.png")
     print(f"worlds: {len(WORLDS)} tilesets + backgrounds")
 
@@ -971,11 +980,163 @@ def generate_menu_bg():
     print("menu background")
 
 
+
+# ---------------------------------------------------------------------------
+# Pixel logotype: "ARROWCLASH" drawn in a chunky 5x7 pixel font with a hard
+# 3D drop - a custom pixel logo always beats a system font on a title screen.
+# ---------------------------------------------------------------------------
+
+FONT_5X7 = {
+    "A": ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
+    "R": ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
+    "O": ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
+    "W": ["10001", "10001", "10001", "10101", "10101", "11011", "10001"],
+    "C": ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
+    "L": ["10000", "10000", "10000", "10000", "10000", "10000", "11111"],
+    "S": ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
+    "H": ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
+}
+
+
+def generate_title():
+    text = "ARROWCLASH"
+    gold = (250, 208, 66, 255)
+    gold_hi = (255, 236, 150, 255)
+    gold_dk = (206, 148, 38, 255)
+    edge = (46, 34, 20, 255)
+    drop = (24, 18, 40, 255)
+
+    w = len(text) * 6 + 3
+    h = 7 + 4
+    c = Canvas(w, h)
+    x = 1
+    for ch in text:
+        glyph = FONT_5X7[ch]
+        for gy, row in enumerate(glyph):
+            for gx, bit in enumerate(row):
+                if bit == "1":
+                    # Hard 3D drop, then the face with a top highlight band
+                    # and a bottom shade band.
+                    c.put(x + gx + 1, 1 + gy + 2, drop)
+                    face = gold_hi if gy == 0 else gold_dk if gy >= 5 else gold
+                    c.put(x + gx, 1 + gy, face)
+        x += 6
+    # Outline the gold face (not the drop) for a sticker-crisp edge.
+    edges = []
+    for y in range(h):
+        for x2 in range(w):
+            if c.get(x2, y)[3] == 0:
+                for nx, ny in ((x2+1,y),(x2-1,y),(x2,y+1),(x2,y-1)):
+                    p2 = c.get(nx, ny)
+                    if p2[3] != 0 and p2 != drop and p2 != edge:
+                        edges.append((x2, y))
+                        break
+    for ex, ey in edges:
+        c.put(ex, ey, edge)
+    c.save(SPRITES / "ui" / "title.png")
+    print("title logo")
+
+
+# ---------------------------------------------------------------------------
+# Background detail pass v2: a nearer decoration layer per world
+# ---------------------------------------------------------------------------
+
+def decorate_alien(c):
+    # Crystals sprouting from the hills + a second, nearer hill ridge.
+    ridge = (52, 42, 96, 255)
+    for x in range(BG_W):
+        h = 10 + (hash2(x // 18, 31) % 9)
+        for y in range(BG_H - h, BG_H):
+            c.put(x, y, ridge)
+    for cx in (30, 90, 170, 230, 290):
+        ch = 6 + hash2(cx, 33) % 5
+        col = (120, 230, 170, 255) if cx % 2 else (150, 210, 240, 255)
+        for i in range(ch):
+            c.put(cx, BG_H - 8 - i, col)
+            if i < ch - 2:
+                c.put(cx + 1, BG_H - 8 - i, tuple(v * 3 // 4 for v in col[:3]) + (255,))
+    c.put(31, BG_H - 8 - 7, (240, 255, 250, 255))
+
+
+def decorate_castle(c):
+    # Banner flags on the towers + drifting cloud wisps.
+    for fx, fy in ((36, 92), (136, 80), (244, 96)):
+        for i in range(4):
+            c.put(fx, fy - 4 + i, (60, 50, 80, 255))       # pole
+        for i in range(3):
+            c.put(fx + 1 + i, fy - 4, (196, 60, 70, 255))  # flag
+            if i < 2:
+                c.put(fx + 1 + i, fy - 3, (196, 60, 70, 255))
+    for wx, wy, wl in ((60, 40, 22), (180, 26, 30), (280, 54, 18)):
+        for i in range(wl):
+            c.put(wx + i, wy, (150, 110, 140, 255))
+            if i % 3 == 0:
+                c.put(wx + i, wy - 1, (150, 110, 140, 255))
+
+
+def decorate_lava(c):
+    # Stalagmites rising from the rock islands + dithered heat shimmer band.
+    rock = (24, 8, 14, 255)
+    for x0 in (52, 162, 262):
+        for i in range(9):
+            wdt = max(1, 4 - i // 2)
+            for dx in range(-wdt, wdt + 1):
+                c.put(x0 + dx, BG_H - 30 - i, rock)
+    for x in range(BG_W):
+        if (x + 1) % 2 == 0:
+            c.put(x, BG_H - 35, (140, 52, 30, 255))
+        if x % 3 == 0:
+            c.put(x, BG_H - 37, (100, 36, 26, 255))
+
+
+def decorate_sludge(c):
+    # Hazard stripes on the big pipe + leaky barrels by the vats.
+    for x in range(0, BG_W, 8):
+        for i in range(4):
+            if x + i < BG_W:
+                c.put(x + i, 13, (206, 172, 60, 255))
+    for bx in (70, 150, 246):
+        for y in range(BG_H - 26, BG_H - 17):
+            for x in range(bx, bx + 8):
+                c.put(x, y, (88, 74, 58, 255))
+        for x in range(bx, bx + 8):
+            c.put(x, BG_H - 24, (110, 94, 74, 255))
+            c.put(x, BG_H - 20, (110, 94, 74, 255))
+        c.put(bx + 3, BG_H - 17, (134, 202, 78, 255))  # drip
+    
+
+def decorate_aquatic(c):
+    # Coral fans + tall seaweed + a sunken mast silhouette.
+    for cx, col in ((50, (214, 108, 118, 255)), (150, (238, 148, 92, 255)), (240, (188, 96, 178, 255))):
+        base = BG_H - 18
+        for i in range(6):
+            c.put(cx - i, base - i, col)
+            c.put(cx - i + 1, base - i, col)
+            c.put(cx + i, base - i, col)
+            c.put(cx + i - 1, base - i, col)
+        c.put(cx, base - 6, col)
+    mastx = 200
+    for y in range(BG_H - 44, BG_H - 10):
+        c.put(mastx, y, (8, 18, 40, 255))
+    for i in range(10):
+        c.put(mastx - 9 + i, BG_H - 38 + i // 2, (8, 18, 40, 255))
+
+
+BG_DECORATORS = {
+    "alien": decorate_alien,
+    "castle": decorate_castle,
+    "lava": decorate_lava,
+    "sludge": decorate_sludge,
+    "aquatic": decorate_aquatic,
+}
+
+
 if __name__ == "__main__":
     generate_characters_and_bows()
     generate_worlds()
     generate_fx()
     generate_menu_bg()
+    generate_title()
     import sys
     if len(sys.argv) > 1:
         contact_sheet(Path(sys.argv[1]))

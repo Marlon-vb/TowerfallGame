@@ -44,17 +44,44 @@ struct MenuView: View {
     private var profile: PlayerProfile { profileService.profile ?? .placeholder }
     private var tier: RankTier { RankTier.tier(for: profile.rating) }
 
+    // The generated pixel logotype (Sprites/ui/title.png).
+    private static let titleImage: UIImage? = {
+        guard let url = Bundle.main.url(forResource: "title", withExtension: "png",
+                                        subdirectory: "Sprites/ui") else { return nil }
+        return UIImage(contentsOfFile: url.path)
+    }()
+
     var body: some View {
         ZStack {
             PixelBackground(name: "menu")
 
+            // Your own character hangs out on the battlement (bottom-left).
+            VStack {
+                Spacer()
+                HStack {
+                    AvatarPreview(avatar: profile.avatar)
+                        .frame(width: 84, height: 84)
+                        .padding(.leading, 34)
+                        .padding(.bottom, 6)
+                    Spacer()
+                }
+            }
+
             VStack(spacing: 14) {
                 Spacer(minLength: 4)
 
-                Text("ARROWCLASH")
-                    .font(.system(size: 40, weight: .heavy, design: .monospaced))
-                    .foregroundColor(.white)
-                    .shadow(color: Color(red: 0.16, green: 0.12, blue: 0.30), radius: 0, x: 3, y: 3)
+                if let title = Self.titleImage {
+                    Image(uiImage: title)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 52)
+                } else {
+                    Text("ARROWCLASH")
+                        .font(.system(size: 40, weight: .heavy, design: .monospaced))
+                        .foregroundColor(.white)
+                        .shadow(color: Color(red: 0.16, green: 0.12, blue: 0.30), radius: 0, x: 3, y: 3)
+                }
 
                 // Rank badge + progression line.
                 HStack(spacing: 10) {

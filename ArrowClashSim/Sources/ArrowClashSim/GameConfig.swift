@@ -114,7 +114,7 @@ public struct GameConfig: Equatable {
         roundOverTicks: Int32 = 120,                             // ~2.0s
         roundsToWin: Int = 3,                                    // best of 5
         stompBounceSpeed: Fixed = Fixed(5),                      // 5.0
-        spawnX0: Int = 19,   // matches Maps.default (Alien Meadow) spawns
+        spawnX0: Int = 35,   // matches Maps.default (Alien Meadow) spawns
         spawnX1: Int = 275,
         spawnY: Int = 162
     ) {
