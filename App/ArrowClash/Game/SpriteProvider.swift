@@ -13,9 +13,10 @@ enum AnimState: Equatable {
     case idle, run, jump, fall, dash, shoot, die
 }
 
-// Layers in back-to-front draw order. Each maps to an avatar slot.
+// Layers in back-to-front draw order. Each maps to an avatar slot. The bow
+// layer only has textures for the shoot animation (hidden otherwise).
 enum AvatarLayer: Int, CaseIterable {
-    case pants, shirt, skin, hair, head
+    case pants, shirt, skin, hair, head, bow
 
     var slot: String {
         switch self {
@@ -24,6 +25,7 @@ enum AvatarLayer: Int, CaseIterable {
         case .skin: return "skin"
         case .hair: return "hair"
         case .head: return "head"
+        case .bow: return "bow"
         }
     }
 
@@ -34,6 +36,7 @@ enum AvatarLayer: Int, CaseIterable {
         case .skin: return avatar.skin
         case .hair: return avatar.hair
         case .head: return avatar.head
+        case .bow: return avatar.bow
         }
     }
 }

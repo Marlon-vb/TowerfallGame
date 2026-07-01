@@ -108,7 +108,7 @@ final class PlaceholderSpriteProvider: SpriteProvider {
             box(ctx, CGRect(x: cx - 4 + pose.lean, y: 5 + pose.bobY, width: 8, height: 9))
         case .hair:
             box(ctx, CGRect(x: cx - 5 + pose.lean, y: 2 + pose.bobY, width: 10, height: 5))
-        case .head:
+        case .head, .bow:
             break
         }
     }

@@ -22,9 +22,10 @@ final class AnimatedAvatarNode: SKNode {
         self.avatar = avatar
         self.provider = provider
         // Scale the source frame so the character reads a bit larger than the
-        // hitbox, preserving the source aspect ratio.
+        // hitbox, preserving the source aspect ratio. (1.7 keeps the chibi
+        // readable but leaves more of the arena visible.)
         let native = provider.nativeFrameSize
-        let targetHeight = height * 2.2
+        let targetHeight = height * 1.7
         let scale = native.height > 0 ? targetHeight / native.height : 1
         self.displaySize = CGSize(width: native.width * scale, height: native.height * scale)
         super.init()

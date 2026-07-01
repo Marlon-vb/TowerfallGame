@@ -45,8 +45,10 @@ final class ChibiSpriteProvider: SpriteProvider {
         return Catalog.color(itemId)
     }
 
-    // Maps a layer + equipped item to its sprite folder. Head accessories have
-    // one folder per style (ids match folder names); "head_none" hides the layer.
+    // Maps a layer + equipped item to its sprite folder. Head accessories and
+    // bows have one folder per style (ids match folder names); "head_none"
+    // hides the layer. Bow folders only contain shoot frames, so the layer is
+    // hidden in every other state automatically.
     private func layerFolder(part: AvatarLayer, itemId: String) -> String? {
         switch part {
         case .skin: return "skin"
@@ -54,6 +56,7 @@ final class ChibiSpriteProvider: SpriteProvider {
         case .shirt: return "shirt"
         case .pants: return "pants"
         case .head: return itemId == "head_none" ? nil : itemId
+        case .bow: return itemId.isEmpty ? "bow_wood" : itemId
         }
     }
 

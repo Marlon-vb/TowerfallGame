@@ -14,9 +14,35 @@ struct Avatar: Codable, Equatable {
     var pants: String
     var head: String
     var trail: String
+    var bow: String
 
     static let `default` = Avatar(skin: "skin_2", hair: "hair_brown", shirt: "shirt_gray",
-                                  pants: "pants_navy", head: "head_none", trail: "trail_white")
+                                  pants: "pants_navy", head: "head_none", trail: "trail_white",
+                                  bow: "bow_wood")
+
+    init(skin: String, hair: String, shirt: String, pants: String,
+         head: String, trail: String, bow: String) {
+        self.skin = skin
+        self.hair = hair
+        self.shirt = shirt
+        self.pants = pants
+        self.head = head
+        self.trail = trail
+        self.bow = bow
+    }
+
+    // Backward-compatible decoding: profiles stored before the bow slot
+    // existed decode with the default bow.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        skin = try c.decode(String.self, forKey: .skin)
+        hair = try c.decode(String.self, forKey: .hair)
+        shirt = try c.decode(String.self, forKey: .shirt)
+        pants = try c.decode(String.self, forKey: .pants)
+        head = try c.decode(String.self, forKey: .head)
+        trail = try c.decode(String.self, forKey: .trail)
+        bow = try c.decodeIfPresent(String.self, forKey: .bow) ?? "bow_wood"
+    }
 }
 
 struct PlayerProfile: Codable, Equatable {
@@ -69,13 +95,29 @@ enum Catalog {
         item("pants_brown", "pants", 0, rgb(0.35, 0.25, 0.15)),
         item("pants_black", "pants", 0, rgb(0.12, 0.12, 0.15)),
         item("pants_teal", "pants", 0, rgb(0.15, 0.45, 0.45)),
-        // Head accessories.
+        // Head accessories. Tintable ones carry a color; the fun full-color
+        // ones are white (a white multiply tint leaves the art unchanged).
         item("head_none", "head", 0, .clear, .none),
         item("head_cap", "head", 100, rgb(0.80, 0.20, 0.20), .cap),
         item("head_helmet", "head", 200, rgb(0.70, 0.70, 0.75), .helmet),
         item("head_horns", "head", 250, rgb(0.95, 0.95, 0.90), .horns),
         item("head_halo", "head", 350, rgb(1.00, 0.95, 0.40), .halo),
         item("head_crown", "head", 500, rgb(1.00, 0.84, 0.20), .crown),
+        // Limited fun heads (full-color art).
+        item("head_fish", "head", 600, .white),
+        item("head_crow", "head", 550, .white),
+        item("head_tv", "head", 500, .white),
+        item("head_frog", "head", 450, .white),
+        item("head_cat", "head", 350, .white),
+        item("head_wizard", "head", 400, .white),
+        item("head_pirate", "head", 400, .white),
+        item("head_viking", "head", 400, .white),
+        item("head_ninja", "head", 300, .white),
+        // Bows (full-color art; visible while shooting).
+        item("bow_wood", "bow", 0, .white),
+        item("bow_silver", "bow", 300, .white),
+        item("bow_gold", "bow", 500, .white),
+        item("bow_crystal", "bow", 800, .white),
         // Trails.
         item("trail_white", "trail", 0, .white),
         item("trail_fire", "trail", 200, rgb(1.00, 0.50, 0.15)),
@@ -100,6 +142,7 @@ enum Catalog {
         case "pants": return avatar.pants
         case "head": return avatar.head
         case "trail": return avatar.trail
+        case "bow": return avatar.bow
         default: return ""
         }
     }
@@ -113,13 +156,14 @@ enum Catalog {
         case "pants": a.pants = id
         case "head": a.head = id
         case "trail": a.trail = id
+        case "bow": a.bow = id
         default: break
         }
         return a
     }
 
     // Display order of slots for the customize screen.
-    static let customizeSlots = ["skin", "hair", "shirt", "pants", "head", "trail"]
+    static let customizeSlots = ["skin", "hair", "shirt", "pants", "head", "bow", "trail"]
 
     private static func item(_ id: String, _ slot: String, _ cost: Int, _ color: UIColor, _ accessory: AccessoryStyle = .none) -> StoreItem {
         StoreItem(id: id, slot: slot, cost: cost, color: color, accessory: accessory)

@@ -69,6 +69,10 @@ func loadProfileVersioned(ctx context.Context, nk runtime.NakamaModule, userID s
 	if profile.Avatar.Skin == "" {
 		profile.Avatar = defaultAvatar()
 	}
+	// Profiles stored before the bow slot existed get the default bow.
+	if profile.Avatar.Bow == "" {
+		profile.Avatar.Bow = "bow_wood"
+	}
 	return profile, objects[0].Version, nil
 }
 
@@ -305,6 +309,7 @@ func rpcSetAvatar(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 			{requested.Pants, "pants"},
 			{requested.Head, "head"},
 			{requested.Trail, "trail"},
+			{requested.Bow, "bow"},
 		}
 		for _, part := range parts {
 			if !itemInSlot(part.id, part.slot) {

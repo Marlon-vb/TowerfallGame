@@ -156,10 +156,14 @@ def draw_skin(c, p):
     hx0, hy0, hx1, hy1 = head_box(p)
     draw_head_shape(c, hx0, hy0, hx1, hy1, gray(G_BASE), gray(G_SHADE))
 
+    # Top-light highlight band across the crown (extra 16-bit read).
+    for x in range(hx0 + 3, hx1 - 1):
+        c.put(x, hy0 + 1, gray(G_LIGHT))
+
     # Ear nub on the left (back of head, since we face right).
     c.rect(hx0 - 1, hy0 + 5, hx0 - 1, hy0 + 6, gray(G_SHADE))
 
-    # Face: two eyes shifted toward facing (right).
+    # Face: two eyes shifted toward facing (right), with a glint pixel.
     if "dead_eyes" in p["flags"]:
         for ex in (hx0 + 5, hx1 - 3):
             ey = hy0 + 5
@@ -168,6 +172,7 @@ def draw_skin(c, p):
     else:
         for ex in (hx0 + 5, hx1 - 3):
             c.rect(ex, hy0 + 5, ex, hy0 + 6, EYE)
+            c.put(ex, hy0 + 5, (232, 230, 240, 255))  # glint
     # Tiny mouth line only on die (shock); none otherwise (ref style).
 
     bdx, bdy = p["body"]
@@ -192,29 +197,45 @@ def draw_skin(c, p):
     if "speed" in p["flags"]:
         for sx, sy in ((2, 10), (1, 13), (3, 16)):
             c.rect(sx, sy, sx + 2, sy, gray(G_SHADE))
-    if "bow_draw" in p["flags"] or "bow_release" in p["flags"]:
-        # Bow: a right-facing arc (limbs curve toward the player), drawn in wood
-        # brown + dark outline so it reads as equipment, not body.
-        wood = (150, 112, 78, 255)
+    # The bow itself is a separate cosmetic layer (bow_<style>), drawn only for
+    # the shoot frames - see draw_bow.
+
+    c.outline()
+
+
+# Bow cosmetics: full-color (non-tintable) layers drawn only for shoot frames,
+# anchored to the same extended-arm pose the skin layer draws.
+def make_bow(limb, string_col, accent=None):
+    def draw(c, p):
+        bdx, bdy = p["body"]
         bx = 21 + bdx
         cy = 15 + bdy
         for yy in range(cy - 3, cy + 4):
-            c.put(bx, yy, wood)                     # bow belly
-        c.put(bx - 1, cy - 4, wood); c.put(bx - 1, cy + 4, wood)  # curved tips
-        c.put(bx - 2, cy - 5, wood); c.put(bx - 2, cy + 5, wood)
-        string = (236, 236, 242, 255)
+            c.put(bx, yy, limb)                      # bow belly
+        c.put(bx - 1, cy - 4, limb); c.put(bx - 1, cy + 4, limb)  # curved tips
+        c.put(bx - 2, cy - 5, limb); c.put(bx - 2, cy + 5, limb)
+        if accent:
+            c.put(bx, cy, accent)                    # grip accent
         if "bow_draw" in p["flags"]:
             # String pulled back to the face + nocked arrow across the arm.
             for yy in range(cy - 4, cy + 5):
-                c.put(bx - 4, yy, string)
+                c.put(bx - 4, yy, string_col)
             c.rect(15 + bdx, cy, bx + 1, cy, (110, 84, 58, 255))  # arrow shaft
             c.put(bx + 2, cy, (216, 216, 224, 255))               # arrow head
         else:
             # String snapped straight between the tips.
             for yy in range(cy - 4, cy + 5):
-                c.put(bx - 2 if yy in (cy - 4, cy + 4) else bx - 1, yy, string)
+                c.put(bx - 2 if yy in (cy - 4, cy + 4) else bx - 1, yy, string_col)
+        c.outline()
+    return draw
 
-    c.outline()
+
+BOW_LAYERS = {
+    "bow_wood":    make_bow((150, 112, 78, 255), (236, 236, 242, 255)),
+    "bow_silver":  make_bow((198, 202, 214, 255), (240, 244, 250, 255), accent=(150, 155, 170, 255)),
+    "bow_gold":    make_bow((238, 198, 74, 255), (250, 240, 200, 255), accent=(184, 140, 40, 255)),
+    "bow_crystal": make_bow((140, 216, 240, 255), (222, 248, 255, 255), accent=(96, 170, 220, 255)),
+}
 
 
 def draw_hair(c, p):
@@ -296,6 +317,135 @@ def draw_head_crown(c, p):
     c.outline()
 
 
+# MARK: fun full-color heads (catalog color is white, so tinting is a no-op)
+
+def draw_head_fish(c, p):
+    hx0, hy0, hx1, hy1 = head_box(p)
+    body = (72, 140, 214, 255)
+    belly = (150, 200, 240, 255)
+    fin = (52, 104, 170, 255)
+    # Fish body swallowing the whole head.
+    c.rect(hx0 - 1, hy0 - 2, hx1 + 1, hy0 + 6, body)
+    c.rect(hx0, hy0 + 5, hx1, hy0 + 6, belly)
+    # Tail sticking out the back (left).
+    c.rect(hx0 - 3, hy0, hx0 - 2, hy0 + 4, fin)
+    c.put(hx0 - 4, hy0 - 1, fin); c.put(hx0 - 4, hy0 + 5, fin)
+    # Top fin.
+    c.rect(hx0 + 4, hy0 - 4, hx0 + 8, hy0 - 3, fin)
+    # Fish eye + open mouth at the front.
+    c.put(hx1 - 2, hy0 + 1, (250, 250, 250, 255))
+    c.put(hx1 - 2, hy0 + 2, (20, 20, 30, 255))
+    c.rect(hx1, hy0 + 4, hx1 + 1, hy0 + 5, (30, 30, 46, 255))
+    c.outline()
+
+
+def draw_head_crow(c, p):
+    hx0, hy0, hx1, hy1 = head_box(p)
+    body = (38, 38, 48, 255)
+    # A crow perched on the crown, facing right.
+    c.rect(hx0 + 4, hy0 - 5, hx0 + 9, hy0 - 1, body)          # body
+    c.rect(hx0 + 8, hy0 - 7, hx0 + 11, hy0 - 4, body)         # head
+    c.rect(hx0 + 2, hy0 - 4, hx0 + 3, hy0 - 3, body)          # tail
+    c.put(hx0 + 11, hy0 - 6, (240, 168, 48, 255))             # beak
+    c.put(hx0 + 12, hy0 - 6, (240, 168, 48, 255))
+    c.put(hx0 + 9, hy0 - 6, (240, 240, 246, 255))             # eye
+    c.put(hx0 + 5, hy0 - 1, (240, 168, 48, 255))              # legs
+    c.put(hx0 + 7, hy0 - 1, (240, 168, 48, 255))
+    c.outline()
+
+
+def draw_head_tv(c, p):
+    hx0, hy0, hx1, hy1 = head_box(p)
+    frame = (110, 84, 58, 255)
+    screen = (110, 220, 130, 255)
+    scan = (80, 180, 100, 255)
+    c.rect(hx0 - 1, hy0 - 2, hx1 + 1, hy0 + 7, frame)
+    c.rect(hx0 + 1, hy0, hx1 - 1, hy0 + 5, screen)
+    for x in range(hx0 + 1, hx1):                              # scanline
+        if (x - hx0) % 2 == 0:
+            c.put(x, hy0 + 2, scan)
+    c.rect(hx0 + 4, hy0 + 2, hx0 + 4, hy0 + 3, (30, 30, 40, 255))  # screen eyes
+    c.rect(hx1 - 4, hy0 + 2, hx1 - 4, hy0 + 3, (30, 30, 40, 255))
+    c.put(hx0 + 8, hy0 - 4, (60, 60, 70, 255))                 # antenna
+    c.put(hx0 + 7, hy0 - 5, (60, 60, 70, 255))
+    c.put(hx0 + 9, hy0 - 3, (60, 60, 70, 255))
+    c.outline()
+
+
+def draw_head_frog(c, p):
+    hx0, hy0, hx1, hy1 = head_box(p)
+    green = (108, 190, 92, 255)
+    dark = (78, 150, 66, 255)
+    c.rect(hx0, hy0 - 2, hx1, hy0 + 3, green)                  # dome
+    c.rect(hx0, hy0 + 3, hx1, hy0 + 3, dark)
+    for bx in (hx0 + 2, hx1 - 3):                              # bulge eyes
+        c.rect(bx, hy0 - 4, bx + 1, hy0 - 3, green)
+        c.put(bx, hy0 - 4, (250, 250, 250, 255))
+        c.put(bx + 1, hy0 - 4, (24, 24, 34, 255))
+    c.outline()
+
+
+def draw_head_cat(c, p):
+    hx0, hy0, hx1, hy1 = head_box(p)
+    fur = (232, 176, 96, 255)
+    inner = (240, 130, 150, 255)
+    for bx in (hx0 + 1, hx1 - 3):
+        c.rect(bx, hy0 - 2, bx + 2, hy0 - 1, fur)              # ear base
+        c.put(bx + 1, hy0 - 3, fur)                            # tip
+        c.put(bx + 1, hy0 - 1, inner)                          # inner
+    c.outline()
+
+
+def draw_head_wizard(c, p):
+    hx0, hy0, hx1, hy1 = head_box(p)
+    hat = (110, 70, 180, 255)
+    band = (238, 198, 74, 255)
+    c.rect(hx0 - 1, hy0, hx1 + 1, hy0 + 1, hat)                # brim
+    c.rect(hx0 + 2, hy0 - 3, hx1 - 2, hy0 - 1, hat)            # cone base
+    c.rect(hx0 + 4, hy0 - 5, hx1 - 4, hy0 - 4, hat)
+    c.rect(hx0 + 6, hy0 - 7, hx0 + 7, hy0 - 6, hat)            # tip (bent)
+    c.put(hx0 + 8, hy0 - 8, hat)
+    c.put(hx0 + 5, hy0 - 2, band)                              # star
+    c.outline()
+
+
+def draw_head_pirate(c, p):
+    hx0, hy0, hx1, hy1 = head_box(p)
+    hat = (40, 40, 52, 255)
+    trim = (238, 198, 74, 255)
+    c.rect(hx0 - 1, hy0 - 1, hx1 + 1, hy0 + 1, hat)            # wide tricorn
+    c.rect(hx0 + 1, hy0 - 3, hx1 - 1, hy0 - 2, hat)
+    c.rect(hx0 - 1, hy0 + 1, hx1 + 1, hy0 + 1, trim)           # gold trim
+    c.put(hx0 + 6, hy0 - 2, (245, 245, 245, 255))              # skull mark
+    c.put(hx0 + 8, hy0 - 2, (245, 245, 245, 255))
+    c.put(hx0 + 7, hy0 - 1, (245, 245, 245, 255))
+    c.outline()
+
+
+def draw_head_viking(c, p):
+    hx0, hy0, hx1, hy1 = head_box(p)
+    helm = (150, 154, 166, 255)
+    horn = (238, 232, 214, 255)
+    c.rect(hx0, hy0 - 2, hx1, hy0 + 3, helm)
+    c.rect(hx0 + 3, hy0 - 3, hx1 - 3, hy0 - 3, helm)
+    c.put(hx0 + 8, hy0 - 1, (110, 114, 126, 255))              # rivet
+    for bx, dx in ((hx0 - 1, -1), (hx1 + 1, 1)):               # horns
+        c.rect(bx, hy0 - 2, bx, hy0, horn)
+        c.put(bx + dx, hy0 - 4, horn)
+        c.put(bx, hy0 - 3, horn)
+    c.outline()
+
+
+def draw_head_ninja(c, p):
+    hx0, hy0, hx1, hy1 = head_box(p)
+    band = (52, 56, 78, 255)
+    c.rect(hx0 - 1, hy0 + 2, hx1 + 1, hy0 + 3, band)           # forehead band
+    c.rect(hx0 - 3, hy0 + 3, hx0 - 2, hy0 + 6, band)           # trailing knot
+    c.put(hx0 - 4, hy0 + 7, band)
+    c.put(hx1 - 4, hy0 + 2, (196, 60, 60, 255))                # metal plate mark
+    c.outline()
+
+
 CHAR_LAYERS = {
     "skin": draw_skin,
     "hair": draw_hair,
@@ -306,10 +456,450 @@ CHAR_LAYERS = {
     "head_horns": draw_head_horns,
     "head_halo": draw_head_halo,
     "head_crown": draw_head_crown,
+    "head_fish": draw_head_fish,
+    "head_crow": draw_head_crow,
+    "head_tv": draw_head_tv,
+    "head_frog": draw_head_frog,
+    "head_cat": draw_head_cat,
+    "head_wizard": draw_head_wizard,
+    "head_pirate": draw_head_pirate,
+    "head_viking": draw_head_viking,
+    "head_ninja": draw_head_ninja,
 }
 
 
-def generate_characters():
+# ---------------------------------------------------------------------------
+# World themes: tilesets + 16-bit backgrounds
+# ---------------------------------------------------------------------------
+# Five worlds; Maps.themes maps each map id to one of these by name.
+
+TILE = 16
+N, E, S, W = 1, 2, 4, 8
+BG_W, BG_H = 320, 192  # world size at 20x12 tiles
+
+WORLDS = {
+    "alien": dict(
+        base=(96, 68, 138), shade=(76, 52, 112), lip=(122, 224, 168),
+        lip2=(86, 178, 128), outline=(28, 20, 48),
+        sky=[(20, 18, 46), (32, 26, 66), (46, 36, 88)],
+    ),
+    "castle": dict(
+        base=(132, 130, 144), shade=(104, 102, 118), lip=(172, 170, 186),
+        lip2=(148, 146, 162), outline=(42, 40, 56),
+        sky=[(52, 38, 78), (96, 60, 100), (176, 106, 100)],
+    ),
+    "lava": dict(
+        base=(70, 58, 66), shade=(52, 42, 50), lip=(104, 88, 98),
+        lip2=(86, 72, 82), outline=(22, 16, 22),
+        sky=[(30, 10, 16), (56, 18, 22), (92, 30, 26)],
+    ),
+    "sludge": dict(
+        base=(112, 120, 112), shade=(88, 96, 90), lip=(134, 202, 78),
+        lip2=(104, 164, 62), outline=(32, 40, 34),
+        sky=[(30, 40, 32), (44, 58, 44), (62, 78, 58)],
+    ),
+    "aquatic": dict(
+        base=(198, 174, 126), shade=(166, 142, 98), lip=(228, 208, 162),
+        lip2=(206, 184, 138), outline=(72, 58, 40),
+        sky=[(14, 34, 72), (20, 52, 100), (30, 74, 130)],
+    ),
+}
+
+
+def hash2(x, y):
+    h = (x * 374761393 + y * 668265263) & 0xFFFFFFFF
+    h = (h ^ (h >> 13)) * 1274126177 & 0xFFFFFFFF
+    return (h >> 16) & 0xFFFF
+
+
+def speckle(x, y, mod=23):
+    return hash2(x, y) % mod == 0
+
+
+def generate_tileset(name, t):
+    base = t["base"] + (255,)
+    shade = t["shade"] + (255,)
+    lip = t["lip"] + (255,)
+    lip2 = t["lip2"] + (255,)
+    outline = t["outline"] + (255,)
+
+    for mask in range(16):
+        c = Canvas(TILE, TILE)
+        # Themed fill.
+        for y in range(TILE):
+            for x in range(TILE):
+                col = base
+                if name == "castle":
+                    # Staggered brick mortar lines.
+                    if y % 8 == 7 or (x + (8 if (y // 8) % 2 else 0)) % 16 == 15:
+                        col = shade
+                elif name == "sludge":
+                    # Metal plates with rivets.
+                    if (x % 8 == 0) or (y % 8 == 0):
+                        col = shade
+                    elif (x % 8 in (2, 5)) and (y % 8 in (2, 5)) and speckle(x, y, 3):
+                        col = shade
+                elif name == "lava":
+                    if speckle(x + mask, y, 31):
+                        col = (232, 120, 40, 255)  # embers
+                    elif speckle(x + mask * 3, y + 7, 17):
+                        col = shade
+                elif name == "aquatic":
+                    if speckle(x + mask, y, 29):
+                        col = (240, 236, 224, 255)  # shell flecks
+                    elif speckle(x + mask * 5, y + 3, 13):
+                        col = shade
+                else:  # alien
+                    if speckle(x + mask, y, 19):
+                        col = shade
+                c.put(x, y, col)
+
+        exp_n = not (mask & N)
+        exp_e = not (mask & E)
+        exp_s = not (mask & S)
+        exp_w = not (mask & W)
+
+        if exp_n:
+            for x in range(TILE):
+                c.put(x, 0, outline)
+                c.put(x, 1, lip)
+                c.put(x, 2, lip if name in ("alien", "sludge") and x % 3 != 2 else lip2)
+            if name in ("alien", "sludge"):
+                # Grass / slime drips hanging off the lip.
+                for x in range(TILE):
+                    if hash2(x, mask) % 5 == 0:
+                        c.put(x, 3, lip2)
+        if exp_s:
+            for x in range(TILE):
+                c.put(x, TILE - 1, outline)
+                c.put(x, TILE - 2, shade)
+        if exp_w:
+            for y in range(TILE):
+                c.put(0, y, outline)
+                c.put(1, y, lip2 if (exp_n and y <= 2) else shade)
+        if exp_e:
+            for y in range(TILE):
+                c.put(TILE - 1, y, outline)
+                c.put(TILE - 2, y, lip2 if (exp_n and y <= 2) else shade)
+
+        # Rounded exposed corners.
+        for (cx, cy, ex, ey) in ((0, 0, exp_w, exp_n), (TILE - 1, 0, exp_e, exp_n),
+                                 (0, TILE - 1, exp_w, exp_s), (TILE - 1, TILE - 1, exp_e, exp_s)):
+            if ex and ey:
+                c.put(cx, cy, (0, 0, 0, 0))
+                c.put(cx + (1 if cx == 0 else -1), cy, outline)
+                c.put(cx, cy + (1 if cy == 0 else -1), outline)
+
+        c.save(SPRITES / "tiles" / name / f"t{mask}.png")
+
+
+# MARK: backgrounds
+
+def vgrad(c, bands, dither=True):
+    """Fill the canvas with horizontal bands + 1px dither rows between them."""
+    n = len(bands)
+    for y in range(c.h):
+        idx = min(n - 1, y * n // c.h)
+        col = bands[idx] + (255,)
+        if dither and idx + 1 < n:
+            edge = (idx + 1) * c.h // n
+            if edge - y <= 2 and (x_dither := True):
+                pass
+        for x in range(c.w):
+            c.put(x, y, col)
+    # Dither rows at band boundaries.
+    if dither:
+        for i in range(1, n):
+            edge = i * c.h // n
+            for x in range(c.w):
+                if (x + edge) % 2 == 0 and edge - 1 >= 0:
+                    c.put(x, edge - 1, bands[i] + (255,))
+                if (x + edge) % 2 == 1 and edge < c.h:
+                    c.put(x, edge, bands[i - 1] + (255,))
+
+
+def bg_alien(c, t):
+    vgrad(c, t["sky"])
+    # Stars.
+    for i in range(90):
+        x, y = hash2(i, 1) % BG_W, hash2(i, 2) % (BG_H * 2 // 3)
+        c.put(x, y, (230, 230, 245, 255) if i % 3 else (150, 150, 190, 255))
+    # Ringed planet.
+    px, py, pr = 250, 44, 17
+    for y in range(-pr, pr + 1):
+        for x in range(-pr, pr + 1):
+            if x * x + y * y <= pr * pr:
+                col = (206, 140, 190, 255) if (x + y) % 7 else (176, 112, 166, 255)
+                c.put(px + x, py + y, col)
+    for x in range(-27, 28):
+        y = x // 4
+        if abs(x) > pr - 3:
+            c.put(px + x, py + y + 4, (232, 208, 150, 255))
+    # Little UFO.
+    ux, uy = 60, 70
+    for dx in range(-6, 7):
+        c.put(ux + dx, uy, (160, 170, 190, 255))
+    for dx in range(-3, 4):
+        c.put(ux + dx, uy - 1, (120, 230, 170, 255))
+        c.put(ux + dx, uy + 1, (110, 120, 140, 255))
+    # Rolling alien hills silhouette.
+    for x in range(BG_W):
+        h = 22 + (hash2(x // 24, 9) % 14) + (6 if (x // 12) % 2 else 0)
+        for y in range(BG_H - h, BG_H):
+            c.put(x, y, (38, 30, 74, 255))
+
+
+def bg_castle(c, t):
+    vgrad(c, t["sky"])
+    # Moon.
+    mx, my, mr = 262, 36, 11
+    for y in range(-mr, mr + 1):
+        for x in range(-mr, mr + 1):
+            if x * x + y * y <= mr * mr and (x + 4) * (x + 4) + y * y > (mr - 2) * (mr - 2):
+                c.put(mx + x, my + y, (238, 232, 208, 255))
+    # Distant castle silhouette with towers + battlements.
+    sil = (36, 28, 52, 255)
+    def tower(x0, w, top):
+        for x in range(x0, x0 + w):
+            for y in range(top, BG_H):
+                c.put(x, y, sil)
+        for x in range(x0 - 1, x0 + w + 1, 2):  # battlements
+            c.put(x, top - 1, sil)
+            c.put(x, top - 2, sil)
+    tower(30, 16, 96)
+    tower(70, 12, 116)
+    tower(130, 22, 84)
+    tower(190, 12, 118)
+    tower(238, 16, 100)
+    # Wall connecting them.
+    for x in range(20, 300):
+        for y in range(140, BG_H):
+            c.put(x, y, sil)
+    # Lit windows.
+    for i, (wx, wy) in enumerate(((36, 108), (136, 96), (140, 120), (244, 112), (76, 126))):
+        c.put(wx, wy, (240, 200, 90, 255))
+        c.put(wx, wy + 1, (240, 200, 90, 255))
+
+
+def bg_lava(c, t):
+    vgrad(c, t["sky"])
+    # Cavern ceiling stalactites.
+    rock = (24, 8, 14, 255)
+    for x in range(BG_W):
+        h = 10 + hash2(x // 10, 3) % 12
+        for y in range(0, h):
+            c.put(x, y, rock)
+    # Lava lake at the bottom with glow bands.
+    for y in range(BG_H - 34, BG_H):
+        for x in range(BG_W):
+            depth = y - (BG_H - 34)
+            col = (255, 190, 60, 255) if depth < 3 else (244, 120, 30, 255) if depth < 12 else (200, 70, 24, 255)
+            if speckle(x, y, 41):
+                col = (255, 222, 120, 255)
+            c.put(x, y, col)
+    # Rock islands poking out of the lava.
+    for x0 in (40, 150, 250):
+        w = 26
+        for x in range(x0, x0 + w):
+            h = 8 - abs(x - x0 - w // 2) // 2
+            for y in range(BG_H - 30 - h, BG_H - 24):
+                c.put(x, y, rock)
+    # Rising ember dots.
+    for i in range(24):
+        x, y = hash2(i, 5) % BG_W, BG_H - 40 - hash2(i, 6) % 90
+        c.put(x, y, (255, 170, 70, 255))
+
+
+def bg_sludge(c, t):
+    vgrad(c, t["sky"])
+    dark = (24, 32, 26, 255)
+    # Industrial pipes across the top.
+    for y in range(12, 17):
+        for x in range(BG_W):
+            c.put(x, y, (70, 82, 72, 255) if y != 14 else (96, 110, 98, 255))
+    for px in (50, 140, 240):
+        for y in range(17, 40):
+            for x in range(px, px + 6):
+                c.put(x, y, (70, 82, 72, 255))
+        # Drip.
+        c.put(px + 3, 42, (134, 202, 78, 255))
+        c.put(px + 3, 43, (134, 202, 78, 255))
+    # Vats/tanks silhouette.
+    for x0, w, top in ((20, 34, 120), (90, 26, 136), (200, 40, 116), (270, 26, 132)):
+        for x in range(x0, x0 + w):
+            for y in range(top, BG_H):
+                c.put(x, y, dark)
+        for x in range(x0 + 2, x0 + w - 2):
+            c.put(x, top, (134, 202, 78, 255))  # glowing rim
+    # Sludge pool bottom.
+    for y in range(BG_H - 16, BG_H):
+        for x in range(BG_W):
+            col = (110, 180, 60, 255) if y > BG_H - 14 else (134, 202, 78, 255)
+            if speckle(x, y, 37):
+                col = (160, 224, 96, 255)
+            c.put(x, y, col)
+
+
+def bg_aquatic(c, t):
+    vgrad(c, t["sky"])
+    # Light rays from the surface.
+    for i, rx in enumerate((40, 90, 170, 240)):
+        for y in range(0, 120):
+            x = rx + y // 3
+            for w in range(3 + i % 2):
+                cur = c.get(x + w, y)
+                if cur[3]:
+                    c.put(x + w, y, (min(255, cur[0] + 22), min(255, cur[1] + 26), min(255, cur[2] + 30), 255))
+    # Bubbles.
+    for i in range(30):
+        x, y = hash2(i, 7) % BG_W, hash2(i, 8) % (BG_H - 30)
+        c.put(x, y, (190, 220, 240, 255))
+        if i % 4 == 0:
+            c.put(x + 1, y, (150, 190, 220, 255))
+    # Fish silhouettes.
+    fish = (10, 22, 48, 255)
+    for fx, fy in ((60, 60), (200, 40), (140, 90), (260, 76)):
+        for dx in range(6):
+            c.put(fx + dx, fy, fish)
+        c.put(fx + 1, fy - 1, fish); c.put(fx + 2, fy - 1, fish)
+        c.put(fx + 1, fy + 1, fish); c.put(fx + 2, fy + 1, fish)
+        c.put(fx - 1, fy - 1, fish); c.put(fx - 1, fy + 1, fish)  # tail
+    # Sea floor with kelp.
+    floor = (16, 34, 66, 255)
+    for x in range(BG_W):
+        h = 12 + hash2(x // 16, 11) % 8
+        for y in range(BG_H - h, BG_H):
+            c.put(x, y, floor)
+    for kx in (30, 110, 180, 280):
+        for y in range(BG_H - 44, BG_H - 12):
+            x = kx + (1 if (y // 4) % 2 else 0)
+            c.put(x, y, (28, 92, 62, 255))
+
+
+BG_DRAWERS = {
+    "alien": bg_alien,
+    "castle": bg_castle,
+    "lava": bg_lava,
+    "sludge": bg_sludge,
+    "aquatic": bg_aquatic,
+}
+
+
+def generate_worlds():
+    for name, t in WORLDS.items():
+        generate_tileset(name, t)
+        c = Canvas(BG_W, BG_H)
+        BG_DRAWERS[name](c, t)
+        c.save(SPRITES / "backgrounds" / f"{name}.png")
+    print(f"worlds: {len(WORLDS)} tilesets + backgrounds")
+
+
+# ---------------------------------------------------------------------------
+# FX sprites: arrows per kind + treasure chest
+# ---------------------------------------------------------------------------
+
+def arrow_canvas(shaft, head, fletch):
+    c = Canvas(14, 5)
+    for x, ys in ((0, (0, 2, 4)), (1, (0, 1, 2, 3, 4)), (2, (1, 2, 3))):
+        for y in ys:
+            c.put(x, y, fletch)
+    c.rect(3, 2, 9, 2, shaft)
+    for x in (10,):
+        c.put(x, 1, head); c.put(x, 2, head); c.put(x, 3, head)
+    c.put(11, 2, head)
+    c.put(12, 2, tuple(min(255, v + 24) for v in head[:3]) + (255,))
+    return c
+
+
+def generate_fx():
+    wood = (150, 112, 78, 255)
+    steel = (208, 208, 216, 255)
+    arrow_canvas(wood, steel, (196, 84, 84, 255)).save(SPRITES / "fx/arrow.png")
+    # Bomb: dark shaft, round black bomb head with a lit fuse pixel.
+    bomb = arrow_canvas((92, 76, 64, 255), (52, 52, 62, 255), (120, 120, 130, 255))
+    bomb.put(11, 1, (52, 52, 62, 255)); bomb.put(11, 3, (52, 52, 62, 255))
+    bomb.put(13, 0, (255, 200, 80, 255))  # fuse spark
+    bomb.save(SPRITES / "fx/arrow_bomb.png")
+    # Laser: cyan energy bolt.
+    arrow_canvas((90, 220, 240, 255), (200, 250, 255, 255), (60, 160, 200, 255)).save(SPRITES / "fx/arrow_laser.png")
+    # Drill: grey cone head, stubby.
+    drill = arrow_canvas((140, 140, 150, 255), (190, 190, 200, 255), (100, 100, 110, 255))
+    drill.put(9, 1, (190, 190, 200, 255)); drill.put(9, 3, (190, 190, 200, 255))
+    drill.save(SPRITES / "fx/arrow_drill.png")
+    # Feather: green with a leafy fletch.
+    arrow_canvas((118, 184, 96, 255), (196, 232, 150, 255), (86, 150, 74, 255)).save(SPRITES / "fx/arrow_feather.png")
+
+    # Treasure chest (16x14): wooden with gold trim + keyhole.
+    c = Canvas(16, 14)
+    wood_l = (168, 122, 74, 255)
+    wood_d = (136, 96, 56, 255)
+    gold = (238, 198, 74, 255)
+    c.rect(1, 1, 14, 5, wood_l)              # lid
+    c.rect(1, 6, 14, 12, wood_d)             # body
+    c.rect(1, 5, 14, 6, gold)                # trim band
+    c.rect(7, 5, 8, 8, gold)                 # clasp
+    c.put(7, 7, (90, 62, 30, 255)); c.put(8, 7, (90, 62, 30, 255))  # keyhole
+    for y in (2, 9):
+        c.put(1, y, wood_d); c.put(14, y, wood_d)  # planks
+    c.outline()
+    c.save(SPRITES / "fx/chest.png")
+    print("fx: 5 arrows + chest")
+
+
+# ---------------------------------------------------------------------------
+# Contact sheet (scratch preview only, not committed)
+# ---------------------------------------------------------------------------
+
+def contact_sheet(out_path):
+    scale = 5
+    frames = [(s, f) for s, n in STATES for f in range(n)]
+    cols = max(len(frames), 10)
+    cell = (SIZE + 2) * scale
+    sheet = Image.new("RGBA", (cols * cell, cell * 3 + 40 * scale), (44, 40, 70, 255))
+
+    def tint_img(img, rgb):
+        out = img.copy(); px = out.load()
+        for y in range(out.height):
+            for x in range(out.width):
+                p = px[x, y]
+                if p[3]:
+                    px[x, y] = (p[0] * rgb[0] // 255, p[1] * rgb[1] // 255, p[2] * rgb[2] // 255, p[3])
+        return out
+
+    colors = dict(skin=(242, 199, 158), hair=(89, 56, 31), shirt=(64, 115, 204), pants=(38, 51, 102))
+    # Row 1: base composite. Row 2: with a rotating pick of the new heads.
+    heads = ["head_fish", "head_crow", "head_tv", "head_frog", "head_cat",
+             "head_wizard", "head_pirate", "head_viking", "head_ninja", "head_crown",
+             "head_cap", "head_helmet"]
+    for i, (state, f) in enumerate(frames):
+        comp = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+        for layer in ("pants", "shirt", "skin", "hair"):
+            comp.alpha_composite(tint_img(Image.open(SPRITES / f"chibi/{layer}/{state}/east_{f}.png"), colors[layer]))
+        if state == "shoot":
+            comp.alpha_composite(Image.open(SPRITES / f"chibi/bow_gold/{state}/east_{f}.png"))
+        sheet.alpha_composite(comp.resize((SIZE * scale,) * 2, Image.NEAREST), (i * cell, 0))
+    for i, head in enumerate(heads):
+        comp = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+        for layer in ("pants", "shirt", "skin", "hair"):
+            comp.alpha_composite(tint_img(Image.open(SPRITES / f"chibi/{layer}/idle/east_0.png"), colors[layer]))
+        comp.alpha_composite(Image.open(SPRITES / f"chibi/{head}/idle/east_0.png"))
+        sheet.alpha_composite(comp.resize((SIZE * scale,) * 2, Image.NEAREST), (i * cell, cell))
+    # Row 3: fx sprites + a tile sample of each world.
+    x = 0
+    for fx in ("arrow", "arrow_bomb", "arrow_laser", "arrow_drill", "arrow_feather", "chest"):
+        img = Image.open(SPRITES / f"fx/{fx}.png")
+        img = img.resize((img.width * scale, img.height * scale), Image.NEAREST)
+        sheet.alpha_composite(img, (x, cell * 2 + 10))
+        x += img.width + 6 * scale
+    for name in WORLDS:
+        img = Image.open(SPRITES / f"tiles/{name}/t0.png").resize((TILE * scale,) * 2, Image.NEAREST)
+        sheet.alpha_composite(img, (x, cell * 2))
+        x += (TILE + 2) * scale
+    sheet.save(out_path)
+    print(f"contact sheet: {out_path}")
+
+
+def generate_characters_and_bows():
     n = 0
     for layer, draw in CHAR_LAYERS.items():
         for state, frames in STATES:
@@ -318,151 +908,20 @@ def generate_characters():
                 draw(c, POSES[(state, f)])
                 c.save(SPRITES / "chibi" / layer / state / f"east_{f}.png")
                 n += 1
-    print(f"characters: {n} frames across {len(CHAR_LAYERS)} layers")
-
-
-# ---------------------------------------------------------------------------
-# Tilesets
-# ---------------------------------------------------------------------------
-# Pastel palettes per map theme (bg is used by the scene, not baked into PNGs).
-# Order matches Maps.swift ids: Arena, Pillars, Stairs, Towers, Cross, Ledges,
-# Bridges, Diamond, Layers, Scatter.
-
-THEMES = [
-    dict(bg=(167, 155, 212), base=(124, 111, 176), shade=(104, 92, 152), lip=(201, 191, 232), outline=(58, 49, 83)),
-    dict(bg=(212, 160, 185), base=(168, 114, 144), shade=(146, 95, 124), lip=(235, 201, 219), outline=(78, 46, 65)),
-    dict(bg=(155, 196, 180), base=(110, 156, 138), shade=(92, 134, 118), lip=(198, 230, 217), outline=(47, 74, 64)),
-    dict(bg=(216, 199, 154), base=(176, 155, 106), shade=(152, 132, 88), lip=(239, 227, 190), outline=(85, 72, 43)),
-    dict(bg=(159, 180, 216), base=(113, 137, 180), shade=(95, 117, 156), lip=(197, 212, 238), outline=(47, 61, 89)),
-    dict(bg=(216, 168, 152), base=(176, 120, 98), shade=(152, 101, 82), lip=(239, 207, 194), outline=(84, 50, 40)),
-    dict(bg=(151, 195, 206), base=(106, 152, 166), shade=(88, 130, 143), lip=(194, 228, 235), outline=(44, 70, 77)),
-    dict(bg=(182, 155, 212), base=(138, 111, 176), shade=(118, 92, 152), lip=(217, 201, 238), outline=(64, 49, 92)),
-    dict(bg=(180, 199, 155), base=(138, 156, 110), shade=(118, 134, 92), lip=(220, 233, 198), outline=(65, 74, 47)),
-    dict(bg=(196, 164, 201), base=(152, 124, 158), shade=(131, 105, 136), lip=(229, 205, 232), outline=(70, 48, 73)),
-]
-
-TILE = 16
-N, E, S, W = 1, 2, 4, 8
-
-
-def speckle(x, y):
-    """Fixed pseudo-random speckle pattern (deterministic, seed-free)."""
-    h = (x * 374761393 + y * 668265263) & 0xFFFFFFFF
-    h = (h ^ (h >> 13)) * 1274126177 & 0xFFFFFFFF
-    return (h >> 16) % 23 == 0
-
-
-def generate_tileset(theme_id, t):
-    base, shade, lip, outline = [t[k] + (255,) for k in ("base", "shade", "lip", "outline")]
-    for mask in range(16):
-        c = Canvas(TILE, TILE)
-        # Fill with base + sparse darker speckles.
-        for y in range(TILE):
-            for x in range(TILE):
-                c.put(x, y, shade if speckle(x + mask * TILE, y + theme_id * TILE) else base)
-
-        exp_n = not (mask & N)
-        exp_e = not (mask & E)
-        exp_s = not (mask & S)
-        exp_w = not (mask & W)
-
-        # Exposed-edge treatments.
-        if exp_n:
-            for x in range(TILE):
-                c.put(x, 0, outline)
-                c.put(x, 1, lip)
-                c.put(x, 2, lip)
-        if exp_s:
-            for x in range(TILE):
-                c.put(x, TILE - 1, outline)
-                c.put(x, TILE - 2, shade)
-        if exp_w:
-            for y in range(TILE):
-                c.put(0, y, outline)
-                c.put(1, y, shade if not (exp_n and y <= 2) else lip)
-        if exp_e:
-            for y in range(TILE):
-                c.put(TILE - 1, y, outline)
-                c.put(TILE - 2, y, shade if not (exp_n and y <= 2) else lip)
-
-        # Rounded exposed corners: cut the corner pixel, patch with outline.
-        for (cx, cy, ex, ey) in ((0, 0, exp_w, exp_n), (TILE - 1, 0, exp_e, exp_n),
-                                 (0, TILE - 1, exp_w, exp_s), (TILE - 1, TILE - 1, exp_e, exp_s)):
-            if ex and ey:
-                c.put(cx, cy, (0, 0, 0, 0))
-                nx = cx + (1 if cx == 0 else -1)
-                ny = cy + (1 if cy == 0 else -1)
-                c.put(nx, cy, outline)
-                c.put(cx, ny, outline)
-
-        c.save(SPRITES / "tiles" / f"theme{theme_id}" / f"t{mask}.png")
-
-
-def generate_tiles():
-    for i, t in enumerate(THEMES):
-        generate_tileset(i, t)
-    print(f"tiles: {len(THEMES)} themes x 16 masks")
-
-
-# ---------------------------------------------------------------------------
-# Arrow sprite (points right; the scene rotates it)
-# ---------------------------------------------------------------------------
-
-def generate_arrow():
-    c = Canvas(14, 5)
-    # Fletching (left).
-    for x, ys in ((0, (0, 2, 4)), (1, (0, 1, 2, 3, 4)), (2, (1, 2, 3))):
-        for y in ys:
-            c.put(x, y, (196, 84, 84, 255))
-    # Shaft.
-    c.rect(3, 2, 9, 2, (150, 112, 78, 255))
-    # Head.
-    c.put(10, 1, (208, 208, 216, 255)); c.put(10, 2, (208, 208, 216, 255)); c.put(10, 3, (208, 208, 216, 255))
-    c.put(11, 2, (208, 208, 216, 255)); c.put(12, 2, (232, 232, 238, 255))
-    c.outline()
-    c.save(SPRITES / "fx" / "arrow.png")
-    print("arrow: 1 sprite")
-
-
-# ---------------------------------------------------------------------------
-# Contact sheet (scratch preview only, not committed)
-# ---------------------------------------------------------------------------
-
-def contact_sheet(out_path):
-    scale = 6
-    frames = [(s, f) for s, n in STATES for f in range(n)]
-    cols = len(frames)
-    rows = 3  # composited character, tiles sample, arrow
-    sheet = Image.new("RGBA", (cols * (SIZE + 2) * scale // 1, (SIZE + 2) * scale * 2 + 20 * scale), THEMES[0]["bg"] + (255,))
-
-    # Row 1: full composite (pants+shirt+skin+hair) and Row 2: with cap accessory.
-    for row, layers in enumerate((["pants", "shirt", "skin", "hair"],
-                                  ["pants", "shirt", "skin", "hair", "head_cap"])):
-        for i, (state, f) in enumerate(frames):
-            comp = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-            for layer in layers:
-                img = Image.open(SPRITES / "chibi" / layer / state / f"east_{f}.png")
-                comp.alpha_composite(img)
-            comp = comp.resize((SIZE * scale, SIZE * scale), Image.NEAREST)
-            sheet.alpha_composite(comp, (i * (SIZE + 2) * scale, row * (SIZE + 2) * scale))
-
-    # Row 3: tile sample (theme 0): a small platform = masks W=8|E, etc.
-    y3 = 2 * (SIZE + 2) * scale
-    for i, mask in enumerate([0, N | S, W, W | E, E, 15]):
-        img = Image.open(SPRITES / "tiles/theme0" / f"t{mask}.png").resize((TILE * scale, TILE * scale), Image.NEAREST)
-        sheet.alpha_composite(img, (i * (TILE + 1) * scale, y3))
-    arrow = Image.open(SPRITES / "fx/arrow.png")
-    arrow = arrow.resize((arrow.width * scale, arrow.height * scale), Image.NEAREST)
-    sheet.alpha_composite(arrow, (7 * (TILE + 1) * scale, y3 + 4 * scale))
-
-    sheet.save(out_path)
-    print(f"contact sheet: {out_path}")
+    # Bows exist only for the shoot frames; the provider hides them elsewhere.
+    for layer, draw in BOW_LAYERS.items():
+        for f in range(2):
+            c = Canvas(SIZE, SIZE)
+            draw(c, POSES[("shoot", f)])
+            c.save(SPRITES / "chibi" / layer / "shoot" / f"east_{f}.png")
+            n += 2
+    print(f"characters: {n} frames across {len(CHAR_LAYERS) + len(BOW_LAYERS)} layers")
 
 
 if __name__ == "__main__":
-    generate_characters()
-    generate_tiles()
-    generate_arrow()
+    generate_characters_and_bows()
+    generate_worlds()
+    generate_fx()
     import sys
     if len(sys.argv) > 1:
         contact_sheet(Path(sys.argv[1]))

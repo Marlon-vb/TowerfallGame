@@ -50,6 +50,21 @@ var items = []Item{
 	{ID: "head_horns", Slot: "head", Cost: 250},
 	{ID: "head_halo", Slot: "head", Cost: 350},
 	{ID: "head_crown", Slot: "head", Cost: 500},
+	// Limited fun heads.
+	{ID: "head_fish", Slot: "head", Cost: 600},
+	{ID: "head_crow", Slot: "head", Cost: 550},
+	{ID: "head_tv", Slot: "head", Cost: 500},
+	{ID: "head_frog", Slot: "head", Cost: 450},
+	{ID: "head_cat", Slot: "head", Cost: 350},
+	{ID: "head_wizard", Slot: "head", Cost: 400},
+	{ID: "head_pirate", Slot: "head", Cost: 400},
+	{ID: "head_viking", Slot: "head", Cost: 400},
+	{ID: "head_ninja", Slot: "head", Cost: 300},
+	// Bows: wood free, others store items.
+	{ID: "bow_wood", Slot: "bow", Cost: 0},
+	{ID: "bow_silver", Slot: "bow", Cost: 300},
+	{ID: "bow_gold", Slot: "bow", Cost: 500},
+	{ID: "bow_crystal", Slot: "bow", Cost: 800},
 	// Arrow trails: white free, others store items.
 	{ID: "trail_white", Slot: "trail", Cost: 0},
 	{ID: "trail_fire", Slot: "trail", Cost: 200},
@@ -72,6 +87,7 @@ type Avatar struct {
 	Pants string `json:"pants"`
 	Head  string `json:"head"`
 	Trail string `json:"trail"`
+	Bow   string `json:"bow"`
 }
 
 func defaultAvatar() Avatar {
@@ -82,6 +98,7 @@ func defaultAvatar() Avatar {
 		Pants: "pants_navy",
 		Head:  "head_none",
 		Trail: "trail_white",
+		Bow:   "bow_wood",
 	}
 }
 
