@@ -22,6 +22,16 @@ final class InputBus {
         self.shootLatched = true
     }
 
+    // Clears held/latched state so nothing carries over between matches (e.g. a
+    // Fire tapped as the last match ended firing on the next match's first tick).
+    func reset() {
+        moveX = 0
+        jumpHeld = false
+        dashHeld = false
+        aim = 0
+        shootLatched = false
+    }
+
     // Called exactly once per simulation tick by the scene.
     func consumeForTick() -> InputCommand {
         var buttons: InputCommand.Buttons = []

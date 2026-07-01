@@ -48,8 +48,14 @@ final class OnlineMatchController {
     private var socket: SocketProtocol?
     private var nakamaSession: Session?
     private var transport: NakamaTransport?
-    private var matchId: String?
+    private(set) var matchId: String?
     private var didStart = false
+    // START received before joinMatch resumed (the server can broadcast START in
+    // the same join processing that acks our join); replayed once joined.
+    private var pendingStart: [UInt8]?
+    // Guards the mutable state above: it is written from Task executors and the
+    // socket callback thread.
+    private let stateLock = NSLock()
 
     init(auth: AuthProvider = DeviceAuthProvider()) {
         self.auth = auth
@@ -114,9 +120,17 @@ final class OnlineMatchController {
                 onError?("matchmaker returned no match id or token")
                 return
             }
+            stateLock.lock()
             self.matchId = match.matchID
             self.transport = NakamaTransport(socket: socket, matchId: match.matchID)
+            let buffered = pendingStart
+            pendingStart = nil
+            stateLock.unlock()
             onStatus?("Waiting for opponent...")
+            // If START raced ahead of our join ack, process it now.
+            if let buffered = buffered {
+                handleStart(data: buffered)
+            }
         } catch {
             onError?("\(error)")
         }
@@ -127,6 +141,9 @@ final class OnlineMatchController {
         case MatchOpCode.start:
             handleStart(data: data)
         case MatchOpCode.input:
+            stateLock.lock()
+            let transport = self.transport
+            stateLock.unlock()
             transport?.ingest(data: data)
         default:
             break
@@ -141,15 +158,26 @@ final class OnlineMatchController {
     }
 
     private func handleStart(data: [UInt8]) {
-        guard !didStart else { return }
-        guard let session = nakamaSession,
-              let transport = transport,
-              let payload = try? JSONDecoder().decode(StartPayload.self, from: Data(data)),
+        stateLock.lock()
+        if didStart {
+            stateLock.unlock()
+            return
+        }
+        // START can arrive before joinMatch resumes and sets the transport;
+        // buffer it instead of failing (joinMatch replays it once ready).
+        guard let session = nakamaSession, let transport = transport else {
+            pendingStart = data
+            stateLock.unlock()
+            return
+        }
+        guard let payload = try? JSONDecoder().decode(StartPayload.self, from: Data(data)),
               let slot = payload.order.firstIndex(of: session.userId) else {
+            stateLock.unlock()
             onError?("bad start payload")
             return
         }
         didStart = true
+        stateLock.unlock()
         let seed = UInt64(bitPattern: payload.seed)
         let map = Maps.byID(payload.mapId ?? 0)
         let rollback = RollbackSession(localPlayer: slot, transport: transport, config: .default, seed: seed, map: map)

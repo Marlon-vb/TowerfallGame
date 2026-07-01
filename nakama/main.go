@@ -64,7 +64,12 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 // matchmakerMatched creates a relay match for the matched players and returns
 // its id. Nakama delivers that id to each matched client, which then joins it.
 func matchmakerMatched(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, entries []runtime.MatchmakerEntry) (string, error) {
-	matchID, err := nk.MatchCreate(ctx, moduleName, map[string]interface{}{})
+	// Pass the matched user ids so the relay admits only these two players.
+	users := make([]interface{}, 0, len(entries))
+	for _, e := range entries {
+		users = append(users, e.GetPresence().GetUserId())
+	}
+	matchID, err := nk.MatchCreate(ctx, moduleName, map[string]interface{}{"users": users})
 	if err != nil {
 		logger.Error("failed to create match from matchmaker: %v", err)
 		return "", err

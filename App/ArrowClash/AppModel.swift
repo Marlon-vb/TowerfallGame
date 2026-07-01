@@ -70,8 +70,12 @@ final class AppModel: ObservableObject {
         controller.onReady = { [weak self] session, avatars, map in
             Task { @MainActor in
                 guard let self = self else { return }
+                // The user may have cancelled the search while this was queued;
+                // don't drop them into a match they already left.
+                guard self.controller === controller, self.screen == .searching else { return }
                 let driver = OnlineDriver(session: session)
-                self.scene = self.makeScene(driver: driver, avatars: avatars, map: map)
+                self.scene = self.makeScene(driver: driver, avatars: avatars, map: map,
+                                            matchId: controller.matchId)
                 self.screen = .playing
             }
         }
@@ -130,10 +134,13 @@ final class AppModel: ObservableObject {
         screen = .menu
     }
 
-    private func makeScene(driver: SceneDriver, avatars: [Avatar], map: MapDefinition) -> GameScene {
+    private func makeScene(driver: SceneDriver, avatars: [Avatar], map: MapDefinition,
+                           matchId: String? = nil) -> GameScene {
         var av = avatars
         while av.count < 2 { av.append(.default) }
         let theme = MapThemes.theme(for: map.id)
+
+        input.reset() // no held/latched input carries over from a previous match
 
         let scene = GameScene(input: input, driver: driver, map: map,
                               avatars: av,
@@ -141,7 +148,13 @@ final class AppModel: ObservableObject {
         scene.onMatchEnd = { [weak self] won, kills, rounds in
             Task { @MainActor in
                 self?.matchResult = won
-                await self?.profileService.submitMatchEnd(won: won, kills: kills, rounds: rounds)
+                // Only real online matches earn rewards; the server verifies the
+                // matchId against the relay's match record. Local practice (no
+                // matchId) submits nothing.
+                if let matchId = matchId {
+                    await self?.profileService.submitMatchEnd(matchId: matchId, won: won,
+                                                              kills: kills, rounds: rounds)
+                }
             }
         }
         return scene

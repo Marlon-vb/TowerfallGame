@@ -49,11 +49,16 @@ final class ProfileService: ObservableObject {
         }
     }
 
-    private struct MatchEndRequest: Encodable { let won: Bool; let kills: Int; let rounds: Int }
+    private struct MatchEndRequest: Encodable {
+        let matchId: String
+        let won: Bool
+        let kills: Int
+        let rounds: Int
+    }
 
-    func submitMatchEnd(won: Bool, kills: Int, rounds: Int) async {
+    func submitMatchEnd(matchId: String, won: Bool, kills: Int, rounds: Int) async {
         do {
-            let inner = try jsonString(MatchEndRequest(won: won, kills: kills, rounds: rounds))
+            let inner = try jsonString(MatchEndRequest(matchId: matchId, won: won, kills: kills, rounds: rounds))
             profile = try await rpcProfile("match_end", innerPayload: inner)
         } catch {
             statusText = "\(error)"
@@ -90,7 +95,10 @@ final class ProfileService: ObservableObject {
 
     private func ensureToken() async throws -> String {
         if let token = token { return token }
-        let url = URL(string: "\(baseURL)/v2/account/authenticate/device?create=true")!
+        // The host comes from a free-form settings field; never force-unwrap.
+        guard let url = URL(string: "\(baseURL)/v2/account/authenticate/device?create=true") else {
+            throw NakamaHTTPError.badServerHost
+        }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         let basic = Data("\(serverKey):".utf8).base64EncodedString()
@@ -105,10 +113,22 @@ final class ProfileService: ObservableObject {
         return decoded.token
     }
 
-    // Calls an RPC and decodes the returned profile JSON.
+    // Calls an RPC and decodes the returned profile JSON. Retries once after
+    // re-authenticating if the cached session token has expired (HTTP 401).
     private func rpcProfile(_ id: String, innerPayload: String?) async throws -> PlayerProfile {
+        do {
+            return try await rpcProfileOnce(id, innerPayload: innerPayload)
+        } catch NakamaHTTPError.server(401, _) {
+            token = nil
+            return try await rpcProfileOnce(id, innerPayload: innerPayload)
+        }
+    }
+
+    private func rpcProfileOnce(_ id: String, innerPayload: String?) async throws -> PlayerProfile {
         let token = try await ensureToken()
-        let url = URL(string: "\(baseURL)/v2/rpc/\(id)")!
+        guard let url = URL(string: "\(baseURL)/v2/rpc/\(id)") else {
+            throw NakamaHTTPError.badServerHost
+        }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -145,5 +165,6 @@ final class ProfileService: ObservableObject {
 
 enum NakamaHTTPError: Error {
     case badPayload
+    case badServerHost
     case server(Int, String)
 }
