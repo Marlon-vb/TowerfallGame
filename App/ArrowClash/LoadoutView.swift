@@ -82,24 +82,47 @@ struct CustomizeView: View {
 }
 
 // A simple SwiftUI preview of the layered avatar (mirrors AvatarRenderer order).
+// Composites the real chibi layer sprites (idle frame 0), each multiplied by
+// its equipped item color - the same recipe the in-match renderer uses.
 struct AvatarPreview: View {
     let avatar: Avatar
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            VStack(spacing: 0) {
-                Rectangle().fill(Color(uiColor: Catalog.color(avatar.hair)))
-                    .frame(width: w * 0.78, height: h * 0.13)
-                Rectangle().fill(Color(uiColor: Catalog.color(avatar.skin)))
-                    .frame(width: w * 0.74, height: h * 0.17)
-                Rectangle().fill(Color(uiColor: Catalog.color(avatar.shirt)))
-                    .frame(width: w * 0.92, height: h * 0.34)
-                Rectangle().fill(Color(uiColor: Catalog.color(avatar.pants)))
-                    .frame(width: w * 0.80, height: h * 0.30)
-            }
-            .frame(width: w, height: h, alignment: .bottom)
+
+    private static var imageCache: [String: UIImage] = [:]
+
+    private func layerImage(_ folder: String) -> UIImage? {
+        if let cached = Self.imageCache[folder] { return cached }
+        guard let url = Bundle.main.url(forResource: "east_0", withExtension: "png",
+                                        subdirectory: "Sprites/chibi/\(folder)/idle"),
+              let img = UIImage(contentsOfFile: url.path) else { return nil }
+        Self.imageCache[folder] = img
+        return img
+    }
+
+    private var layers: [(folder: String, itemId: String)] {
+        var result: [(String, String)] = [
+            ("pants", avatar.pants),
+            ("shirt", avatar.shirt),
+            ("skin", avatar.skin),
+            ("hair", avatar.hair),
+        ]
+        if avatar.head != "head_none" {
+            result.append((avatar.head, avatar.head))
         }
+        return result
+    }
+
+    var body: some View {
+        ZStack {
+            ForEach(layers, id: \.folder) { layer in
+                if let img = layerImage(layer.folder) {
+                    Image(uiImage: img)
+                        .interpolation(.none)
+                        .resizable()
+                        .colorMultiply(Color(uiColor: Catalog.color(layer.itemId)))
+                }
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
     }
 }
 

@@ -11,19 +11,26 @@ struct MapTheme {
 }
 
 enum MapThemes {
-    // Indexed by map id; falls back to the first if out of range.
+    // Indexed by map id; falls back to the first if out of range. Pastel
+    // palette matching the generated tilesets in tools/generate_pixel_art.py
+    // (backgrounds are the THEMES bg values; tiles are the base fill, used only
+    // as a fallback when a tileset PNG is missing from the bundle).
     static let all: [MapTheme] = [
-        MapTheme(tile: UIColor(red: 0.22, green: 0.24, blue: 0.30, alpha: 1), background: UIColor(red: 0.08, green: 0.09, blue: 0.12, alpha: 1)), // Arena
-        MapTheme(tile: UIColor(red: 0.32, green: 0.22, blue: 0.30, alpha: 1), background: UIColor(red: 0.12, green: 0.07, blue: 0.12, alpha: 1)), // Pillars
-        MapTheme(tile: UIColor(red: 0.20, green: 0.30, blue: 0.26, alpha: 1), background: UIColor(red: 0.06, green: 0.12, blue: 0.10, alpha: 1)), // Stairs
-        MapTheme(tile: UIColor(red: 0.30, green: 0.28, blue: 0.20, alpha: 1), background: UIColor(red: 0.12, green: 0.10, blue: 0.06, alpha: 1)), // Towers
-        MapTheme(tile: UIColor(red: 0.24, green: 0.26, blue: 0.34, alpha: 1), background: UIColor(red: 0.07, green: 0.08, blue: 0.14, alpha: 1)), // Cross
-        MapTheme(tile: UIColor(red: 0.30, green: 0.24, blue: 0.22, alpha: 1), background: UIColor(red: 0.12, green: 0.08, blue: 0.07, alpha: 1)), // Ledges
-        MapTheme(tile: UIColor(red: 0.22, green: 0.30, blue: 0.32, alpha: 1), background: UIColor(red: 0.06, green: 0.11, blue: 0.12, alpha: 1)), // Bridges
-        MapTheme(tile: UIColor(red: 0.28, green: 0.22, blue: 0.34, alpha: 1), background: UIColor(red: 0.10, green: 0.07, blue: 0.14, alpha: 1)), // Diamond
-        MapTheme(tile: UIColor(red: 0.26, green: 0.28, blue: 0.22, alpha: 1), background: UIColor(red: 0.09, green: 0.10, blue: 0.07, alpha: 1)), // Layers
-        MapTheme(tile: UIColor(red: 0.30, green: 0.26, blue: 0.30, alpha: 1), background: UIColor(red: 0.11, green: 0.09, blue: 0.11, alpha: 1)), // Scatter
+        MapTheme(tile: rgb(124, 111, 176), background: rgb(167, 155, 212)), // Arena - lavender
+        MapTheme(tile: rgb(168, 114, 144), background: rgb(212, 160, 185)), // Pillars - rose
+        MapTheme(tile: rgb(110, 156, 138), background: rgb(155, 196, 180)), // Stairs - sage
+        MapTheme(tile: rgb(176, 155, 106), background: rgb(216, 199, 154)), // Towers - sand
+        MapTheme(tile: rgb(113, 137, 180), background: rgb(159, 180, 216)), // Cross - periwinkle
+        MapTheme(tile: rgb(176, 120, 98),  background: rgb(216, 168, 152)), // Ledges - terracotta
+        MapTheme(tile: rgb(106, 152, 166), background: rgb(151, 195, 206)), // Bridges - teal
+        MapTheme(tile: rgb(138, 111, 176), background: rgb(182, 155, 212)), // Diamond - violet
+        MapTheme(tile: rgb(138, 156, 110), background: rgb(180, 199, 155)), // Layers - moss
+        MapTheme(tile: rgb(152, 124, 158), background: rgb(196, 164, 201)), // Scatter - mauve
     ]
+
+    private static func rgb(_ r: Int, _ g: Int, _ b: Int) -> UIColor {
+        UIColor(red: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: 1)
+    }
 
     static func theme(for id: Int) -> MapTheme {
         (id >= 0 && id < all.count) ? all[id] : all[0]

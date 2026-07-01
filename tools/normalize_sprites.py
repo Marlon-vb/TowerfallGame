@@ -3,7 +3,7 @@
 
 Workflow:
   1. Drop raw exports (any size, white OR transparent background) into
-       App/ArrowClash/Sprites/incoming/<state>/*.png
+       art/incoming/<state>/*.png
      where <state> is one of: idle run jump fall dash shoot die
      Files within a state are taken in sorted filename order and become
      east_0.png, east_1.png, ... so name them 0.png, 1.png (or a.png, b.png).
@@ -28,7 +28,9 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-INCOMING = ROOT / "App/ArrowClash/Sprites/incoming"
+# Staging lives OUTSIDE App/ArrowClash/Sprites because that folder is a bundled
+# folder reference - raw multi-MB exports must not ship in the app.
+INCOMING = ROOT / "art/incoming"
 SKIN = ROOT / "App/ArrowClash/Sprites/skin"
 
 STATES = ["idle", "run", "jump", "fall", "dash", "shoot", "die"]
