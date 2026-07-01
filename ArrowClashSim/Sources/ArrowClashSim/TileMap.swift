@@ -46,32 +46,10 @@ public struct TileMap: Equatable {
         return q
     }
 
-    // The single v1 arena: 20 x 12 tiles (320 x 192 px at tileSize 16).
-    // '#' solid, '.' empty. Symmetric, edges open for wrapping.
+    // The default arena's tiles. Delegates to the maps catalog so tests and
+    // harnesses that pair defaultArena() with GameState.initial(config:) always
+    // agree with Maps.default's layout and spawns.
     public static func defaultArena() -> TileMap {
-        let layout = [
-            "....................",
-            "....................",
-            "....................",
-            "...####......####...",
-            "....................",
-            "....................",
-            "......########......",
-            "....................",
-            "....................",
-            "...####......####...",
-            "....................",
-            "....................",
-        ]
-        let rows = layout.count
-        let cols = layout[0].count
-        var solid = [Bool](repeating: false, count: cols * rows)
-        for (r, line) in layout.enumerated() {
-            precondition(line.count == cols, "all arena rows must be the same width")
-            for (c, ch) in line.enumerated() {
-                solid[r * cols + c] = (ch == "#")
-            }
-        }
-        return TileMap(cols: cols, rows: rows, solid: solid)
+        return Maps.default.tileMap()
     }
 }

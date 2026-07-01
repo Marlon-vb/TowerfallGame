@@ -52,6 +52,16 @@ public struct GameConfig: Equatable {
     public var arrowMaxFallSpeed: Fixed // terminal fall speed for arrows
     public var arrowSpawnOffset: Fixed  // distance from player center to spawn the arrow
 
+    // Special arrows + treasure chests (TowerFall-style).
+    public var chestDelayTicks: Int32   // playing-ticks into a round before the chest appears
+    public var chestArrowCount: Int32   // special arrows granted by a chest
+    public var specialCapacity: Int32   // max special arrows held at once
+    public var bombRadius: Fixed        // splash-kill radius around a bomb impact
+    public var laserSpeed: Fixed        // straight, fast (must stay < tileSize)
+    public var featherSpeed: Fixed      // slow straight flier that wraps
+    public var drillLifeTicks: Int32    // drill flight time before it expires
+    public var featherLifeTicks: Int32  // feather flight time before it expires
+
     // Match flow (Phase 4).
     public var countdownTicks: Int32    // freeze before a round begins
     public var roundOverTicks: Int32    // brief result pause after a death
@@ -88,13 +98,21 @@ public struct GameConfig: Equatable {
         arrowGravity: Fixed = Fixed(numerator: 1, denominator: 5), // 0.2
         arrowMaxFallSpeed: Fixed = Fixed(8),                     // 8.0
         arrowSpawnOffset: Fixed = Fixed(8),                      // 8 px ahead of center
+        chestDelayTicks: Int32 = 300,                            // ~5s into the round
+        chestArrowCount: Int32 = 2,
+        specialCapacity: Int32 = 3,
+        bombRadius: Fixed = Fixed(30),                           // ~2 tiles splash
+        laserSpeed: Fixed = Fixed(12),                           // < tileSize (16)
+        featherSpeed: Fixed = Fixed(4),
+        drillLifeTicks: Int32 = 75,                              // ~1.6 screen widths
+        featherLifeTicks: Int32 = 240,                           // ~3 screen crossings
         countdownTicks: Int32 = 90,                              // ~1.5s
         roundOverTicks: Int32 = 120,                             // ~2.0s
         roundsToWin: Int = 3,                                    // best of 5
         stompBounceSpeed: Fixed = Fixed(5),                      // 5.0
-        spawnX0: Int = 112,
-        spawnX1: Int = 192,
-        spawnY: Int = 82
+        spawnX0: Int = 19,   // matches Maps.default (Alien Meadow) spawns
+        spawnX1: Int = 275,
+        spawnY: Int = 162
     ) {
         self.ticksPerSecond = ticksPerSecond
         self.tileSize = tileSize
@@ -119,6 +137,14 @@ public struct GameConfig: Equatable {
         self.arrowGravity = arrowGravity
         self.arrowMaxFallSpeed = arrowMaxFallSpeed
         self.arrowSpawnOffset = arrowSpawnOffset
+        self.chestDelayTicks = chestDelayTicks
+        self.chestArrowCount = chestArrowCount
+        self.specialCapacity = specialCapacity
+        self.bombRadius = bombRadius
+        self.laserSpeed = laserSpeed
+        self.featherSpeed = featherSpeed
+        self.drillLifeTicks = drillLifeTicks
+        self.featherLifeTicks = featherLifeTicks
         self.countdownTicks = countdownTicks
         self.roundOverTicks = roundOverTicks
         self.roundsToWin = roundsToWin

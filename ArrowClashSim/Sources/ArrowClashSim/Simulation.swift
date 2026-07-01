@@ -65,6 +65,37 @@ public enum Simulation {
         }
 
         updateArrows(state: &state, inputs: inputs, priorButtons: priorButtons, map: map, config: config)
+        updateChest(state: &state, config: config)
+    }
+
+    // MARK: - Treasure chest
+
+    // Spawns the round's chest after a deterministic delay at an rng-chosen
+    // chest spot with an rng-chosen special kind; the first player to touch it
+    // (index order on ties) takes its arrows as their special stash.
+    private static func updateChest(state: inout GameState, config: GameConfig) {
+        if state.chest.active {
+            var pi = 0
+            while pi < state.players.count {
+                if state.players[pi].alive
+                    && pointInPlayer(state.chest.pos, player: state.players[pi], config: config) {
+                    state.players[pi].specialKind = state.chest.kind
+                    state.players[pi].specialCount = config.chestArrowCount
+                    state.chest.active = false
+                    break
+                }
+                pi += 1
+            }
+        } else if state.chest.spawnTimer > 0 && !state.chestSpots.isEmpty {
+            state.chest.spawnTimer -= 1
+            if state.chest.spawnTimer == 0 {
+                let spot = Int(state.rng.next(upperBound: UInt32(state.chestSpots.count)))
+                let kinds: [ArrowKind] = [.bomb, .laser, .drill, .feather]
+                let kind = kinds[Int(state.rng.next(upperBound: UInt32(kinds.count)))]
+                state.chest = ChestState(active: true, pos: state.chestSpots[spot],
+                                         kind: kind.rawValue, spawnTimer: 0)
+            }
+        }
     }
 
     // Countdown / round-over: players are frozen but gravity still settles them
@@ -331,13 +362,33 @@ public enum Simulation {
     ) {
         let shootBit = InputCommand.Buttons.shoot.rawValue
 
-        // 1. Shoot (on press edge, if the quiver has an arrow and a slot is free).
+        // 1. Shoot (on press edge, if an arrow is available and a slot is free).
+        //    Special arrows fire before normal ones.
         var i = 0
         while i < state.players.count {
             let buttons = inputs[i].buttons.rawValue
             let shootPressed = (buttons & shootBit) != 0 && (priorButtons[i] & shootBit) == 0
-            if shootPressed && state.players[i].arrows > 0 {
+            let hasSpecial = state.players[i].specialCount > 0
+            if shootPressed && (hasSpecial || state.players[i].arrows > 0) {
                 if let slot = freeArrowSlot(state.arrows) {
+                    var kindRaw: UInt8 = 0
+                    if hasSpecial {
+                        kindRaw = state.players[i].specialKind
+                        state.players[i].specialCount -= 1
+                        if state.players[i].specialCount == 0 {
+                            state.players[i].specialKind = 0
+                        }
+                    } else {
+                        state.players[i].arrows -= 1
+                    }
+
+                    let speed: Fixed
+                    switch ArrowKind(rawValue: kindRaw) ?? .normal {
+                    case .laser: speed = config.laserSpeed
+                    case .feather: speed = config.featherSpeed
+                    default: speed = config.arrowSpeed
+                    }
+
                     let p = state.players[i]
                     let center = FixedVec(
                         x: p.pos.x + config.playerWidth / Fixed(2),
@@ -351,37 +402,43 @@ public enum Simulation {
                     )
                     state.arrows[slot] = ArrowState(
                         pos: spawn,
-                        vel: FixedVec(x: unit.x * config.arrowSpeed, y: unit.y * config.arrowSpeed),
+                        vel: FixedVec(x: unit.x * speed, y: unit.y * speed),
                         active: true,
                         stuck: false,
                         owner: Int8(i),
-                        dir: dir
+                        dir: dir,
+                        kind: kindRaw
                     )
-                    state.players[i].arrows -= 1
                 }
             }
             i += 1
         }
 
-        // 2. Move flying arrows. Point vs tile; stick on contact.
+        // 2. Move flying arrows. Point vs tile; stick on contact (kind-aware).
         var a = 0
         while a < state.arrows.count {
             if state.arrows[a].active && !state.arrows[a].stuck {
                 stepArrow(&state.arrows[a], map: map, config: config)
+                // A bomb that just embedded in a tile explodes immediately.
+                if state.arrows[a].active && state.arrows[a].stuck
+                    && state.arrows[a].arrowKind == .bomb {
+                    explodeBomb(state: &state, at: state.arrows[a].pos, config: config)
+                    state.arrows[a] = .empty
+                }
             }
             a += 1
         }
 
         // 3. Reclaim settled arrows. A player overlapping a stuck arrow picks it
-        //    up if their quiver is not full. Players checked in index order.
+        //    up if they can hold it (specials refill the special stash). Players
+        //    checked in index order.
         a = 0
         while a < state.arrows.count {
             if state.arrows[a].active && state.arrows[a].stuck {
                 var pi = 0
                 while pi < state.players.count {
-                    if state.players[pi].arrows < config.startingArrows
-                        && pointInPlayer(state.arrows[a].pos, player: state.players[pi], config: config) {
-                        state.players[pi].arrows += 1
+                    if pointInPlayer(state.arrows[a].pos, player: state.players[pi], config: config)
+                        && gainArrow(&state.players[pi], kindRaw: state.arrows[a].kind, config: config) {
                         state.arrows[a] = .empty
                         break
                     }
@@ -389,6 +446,45 @@ public enum Simulation {
                 }
             }
             a += 1
+        }
+    }
+
+    // Gives a picked-up/caught arrow to a player. Specials stack in the special
+    // stash (one kind at a time); a different special converts to a normal
+    // arrow if there is room. Returns false if the player cannot hold it.
+    private static func gainArrow(_ p: inout PlayerState, kindRaw: UInt8, config: GameConfig) -> Bool {
+        let kind = ArrowKind(rawValue: kindRaw) ?? .normal
+        if kind != .normal {
+            if (p.specialCount == 0 || p.specialKind == kindRaw)
+                && p.specialCount < config.specialCapacity {
+                p.specialKind = kindRaw
+                p.specialCount += 1
+                return true
+            }
+        }
+        if p.arrows < config.startingArrows {
+            p.arrows += 1
+            return true
+        }
+        return false
+    }
+
+    // Kills every living player within the bomb radius of the impact point
+    // (the owner included - bombs do not discriminate).
+    private static func explodeBomb(state: inout GameState, at point: FixedVec, config: GameConfig) {
+        let r = Int64(config.bombRadius.raw)
+        var pi = 0
+        while pi < state.players.count {
+            if state.players[pi].alive {
+                let cx = state.players[pi].pos.x + config.playerWidth / Fixed(2)
+                let cy = state.players[pi].pos.y + config.playerHeight / Fixed(2)
+                let dx = Int64(cx.raw - point.x.raw)
+                let dy = Int64(cy.raw - point.y.raw)
+                if dx * dx + dy * dy <= r * r {
+                    state.players[pi].alive = false
+                }
+            }
+            pi += 1
         }
     }
 
@@ -402,10 +498,26 @@ public enum Simulation {
     }
 
     private static func stepArrow(_ arrow: inout ArrowState, map: TileMap, config: GameConfig) {
-        // Gravity (light arc).
-        arrow.vel.y += config.arrowGravity
-        if arrow.vel.y > config.arrowMaxFallSpeed {
-            arrow.vel.y = config.arrowMaxFallSpeed
+        let kind = arrow.arrowKind
+        arrow.life += 1
+
+        // Limited-life kinds expire mid-air (gone; not reclaimable).
+        if kind == .drill && arrow.life > config.drillLifeTicks {
+            arrow = .empty
+            return
+        }
+        if kind == .feather && arrow.life > config.featherLifeTicks {
+            arrow = .empty
+            return
+        }
+
+        // Gravity (light arc) - only ballistic kinds; laser/drill/feather fly
+        // perfectly straight.
+        if kind == .normal || kind == .bomb {
+            arrow.vel.y += config.arrowGravity
+            if arrow.vel.y > config.arrowMaxFallSpeed {
+                arrow.vel.y = config.arrowMaxFallSpeed
+            }
         }
 
         let previous = arrow.pos
@@ -413,14 +525,18 @@ public enum Simulation {
 
         // Point collision: if the new position is inside a solid tile, stick at
         // the pre-move position so the arrow rests against the surface. Valid
-        // while arrow speed stays below tileSize (see GameConfig).
-        let col = TileMap.tileIndex(arrow.pos.x, tileSize: config.tileSize)
-        let row = TileMap.tileIndex(arrow.pos.y, tileSize: config.tileSize)
-        if map.isSolid(col: col, row: row) {
-            arrow.pos = previous
-            arrow.vel = .zero
-            arrow.stuck = true
-            return
+        // while arrow speed stays below tileSize (see GameConfig). Drills pass
+        // straight through tiles; bombs "stick" for exactly the caller's tick
+        // (the caller detonates and removes them immediately).
+        if kind != .drill {
+            let col = TileMap.tileIndex(arrow.pos.x, tileSize: config.tileSize)
+            let row = TileMap.tileIndex(arrow.pos.y, tileSize: config.tileSize)
+            if map.isSolid(col: col, row: row) {
+                arrow.pos = previous
+                arrow.vel = .zero
+                arrow.stuck = true
+                return
+            }
         }
 
         // Wrap on both axes, like players.
@@ -462,9 +578,9 @@ public enum Simulation {
                     if state.players[pi].alive
                         && state.players[pi].dashActiveTimer > 0
                         && pointInPlayer(state.arrows[a].pos, player: state.players[pi], config: config) {
-                        if state.players[pi].arrows < config.startingArrows {
-                            state.players[pi].arrows += 1
-                        }
+                        // Catch feeds the stash (specials included); if the
+                        // player cannot hold it, the arrow is still swatted dead.
+                        _ = gainArrow(&state.players[pi], kindRaw: state.arrows[a].kind, config: config)
                         state.arrows[a] = .empty
                         break
                     }
@@ -474,7 +590,7 @@ public enum Simulation {
             a += 1
         }
 
-        // Arrows.
+        // Arrows. A direct bomb hit also detonates its splash (owner included).
         a = 0
         while a < state.arrows.count {
             if state.arrows[a].active && !state.arrows[a].stuck {
@@ -484,6 +600,9 @@ public enum Simulation {
                         && Int8(pi) != state.arrows[a].owner
                         && pointInPlayer(state.arrows[a].pos, player: state.players[pi], config: config) {
                         state.players[pi].alive = false
+                        if state.arrows[a].arrowKind == .bomb {
+                            explodeBomb(state: &state, at: state.arrows[a].pos, config: config)
+                        }
                         state.arrows[a].active = false
                     }
                     pi += 1
@@ -570,5 +689,6 @@ public enum Simulation {
             state.arrows[a] = .empty
             a += 1
         }
+        state.chest = ChestState(spawnTimer: config.chestDelayTicks)
     }
 }

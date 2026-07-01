@@ -32,6 +32,11 @@ public struct GameState: Equatable {
     // resets are self-contained inside the tick function.
     public var spawns: [FixedVec]
 
+    // Treasure chest: one per round, spawning mid-round at one of the map's
+    // chest spots (also carried in state so round resets are self-contained).
+    public var chest: ChestState
+    public var chestSpots: [FixedVec]
+
     public init(
         tick: UInt32,
         players: [PlayerState],
@@ -42,7 +47,9 @@ public struct GameState: Equatable {
         scores: [Int],
         round: Int,
         winner: Int8,
-        spawns: [FixedVec]
+        spawns: [FixedVec],
+        chest: ChestState = ChestState(),
+        chestSpots: [FixedVec] = []
     ) {
         self.tick = tick
         self.players = players
@@ -54,6 +61,8 @@ public struct GameState: Equatable {
         self.round = round
         self.winner = winner
         self.spawns = spawns
+        self.chest = chest
+        self.chestSpots = chestSpots
     }
 
     // Starting state for a specific map: players on its spawn points, facing
@@ -64,8 +73,12 @@ public struct GameState: Equatable {
         for (i, sp) in spawnVecs.enumerated() {
             players.append(PlayerState(pos: sp, facing: i == 0 ? 1 : -1, arrows: config.startingArrows))
         }
-        let capacity = config.startingArrows * max(players.count, 1)
+        // Pool must fit every normal arrow plus a chest's worth of specials per
+        // player being in flight/stuck at once.
+        let perPlayer = config.startingArrows + Int(config.chestArrowCount)
+        let capacity = perPlayer * max(players.count, 1)
         let arrows = [ArrowState](repeating: .empty, count: capacity)
+        let chestSpots = map.chests.map { FixedVec(x: Fixed($0.x), y: Fixed($0.y)) }
         return GameState(
             tick: 0,
             players: players,
@@ -76,7 +89,9 @@ public struct GameState: Equatable {
             scores: [Int](repeating: 0, count: players.count),
             round: 0,
             winner: -1,
-            spawns: spawnVecs
+            spawns: spawnVecs,
+            chest: ChestState(spawnTimer: config.chestDelayTicks),
+            chestSpots: chestSpots
         )
     }
 

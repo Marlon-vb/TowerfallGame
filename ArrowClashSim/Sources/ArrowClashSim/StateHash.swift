@@ -45,6 +45,8 @@ public func stateHash(_ state: GameState) -> UInt64 {
         mix(UInt64(p.prevButtons))
         mix(UInt64(bitPattern: Int64(p.arrows)))
         mix(p.alive ? 1 : 0)
+        mix(UInt64(p.specialKind))
+        mix32(p.specialCount)
     }
 
     mix(UInt64(state.arrows.count))
@@ -57,6 +59,18 @@ public func stateHash(_ state: GameState) -> UInt64 {
         mix(arrow.stuck ? 1 : 0)
         mix(UInt64(UInt8(bitPattern: arrow.owner)))
         mix(UInt64(arrow.dir))
+        mix(UInt64(arrow.kind))
+        mix32(arrow.life)
+    }
+
+    mix(state.chest.active ? 1 : 0)
+    mix32(state.chest.pos.x.raw)
+    mix32(state.chest.pos.y.raw)
+    mix(UInt64(state.chest.kind))
+    mix32(state.chest.spawnTimer)
+    for spot in state.chestSpots {
+        mix32(spot.x.raw)
+        mix32(spot.y.raw)
     }
 
     return hash
